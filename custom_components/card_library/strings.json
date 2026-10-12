@@ -1,0 +1,13 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Library Card",
+        "description": "Enable the central template library. Add its JavaScript resource afterwards; see the installation guide."
+      }
+    },
+    "abort": {
+      "already_configured": "Library Card is already configured."
+    }
+  }
+}

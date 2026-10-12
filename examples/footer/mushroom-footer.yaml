@@ -1,0 +1,39 @@
+max_width: 1030
+card:
+  type: horizontal-stack
+  cards:
+    - type: custom:mushroom-chips-card
+      chips:
+        - type: back
+        - type: action
+          icon: mdi:home
+          tap_action:
+            action: navigate
+            navigation_path: /dashboard-test/0
+        - type: quickbar
+          mode: command
+        - type: action
+          icon: mdi:cctv
+          tap_action:
+            action: navigate
+            navigation_path: /dashboard-test/kamera
+        - type: template
+          icon: >-
+            {% set count = 0 %} {% if
+            is_state('input_boolean.ubernachtungshund', 'on') %}{% set count =
+            count + 1 %}{% endif %} {% if is_state('switch.sd_3d_drucker', 'on')
+            %}{% set count = count + 1 %}{% endif %} {% if count > 0 %}
+              mdi:numeric-{{ count }}-box-outline
+            {% else %}
+              mdi:menu
+            {% endif %}
+          icon_color: >-
+            {% set count = 0 %} {% if
+            is_state('input_boolean.ubernachtungshund', 'on') %}{% set count =
+            count + 1 %}{% endif %} {% if is_state('switch.sd_3d_drucker', 'on')
+            %}{% set count = count + 1 %}{% endif %} {{ 'orange' if count > 0
+            else '' }}
+          tap_action:
+            action: navigate
+            navigation_path: '#Menu'
+      alignment: center

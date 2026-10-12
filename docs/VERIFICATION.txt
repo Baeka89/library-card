@@ -1,0 +1,576 @@
+Library Card v0.5.0 — verified 2026-10-12 (Europe/Berlin)
+
+PASS: 340 JavaScript tests + 104 Python tests = 444 tests.
+The Python total includes 22 publication tests using fake GitHub calls.
+PASS: six websocket schemas with real voluptuous and probatio.
+PASS: original current HACS hacs.json schema.
+PASS: official Home Assistant hassfest container, zero invalid integrations.
+Hassfest image digest: sha256:4b1adfb1e0a37710af0390708eb8000230b80b2193ccffbeed0a901fa9765181
+PASS: actual current HACS PR template filled locally with sample evidence URLs.
+PASS: real current HACS catalogue extended alphabetically locally.
+PASS: actual local publication preparation in a directory with spaces,
+      including isolated dependency installation, tests and release build.
+PASS: seven JS module syntax checks, Python compilation, source/ZIP integrity.
+PASS: shared UI styles byte-identical to the internal 0.5.23 source.
+
+NOT RUN: creating a real GitHub repository, public HACS workflow,
+real GitHub release or HACS pull request. These require the owner's login.
+No live HA/native Bubble browser test was performed for this release preparation.
+
+COMMAND: npm test
+
+> library-card@0.5.0 test
+> node tests/core.test.js && node tests/tools.test.js && node tests/ui.test.js && node tests/resources.test.js && node tests/family-calendar.test.js && node tests/popup.test.js && node tests/popup-resource.test.js
+
+✔ central popup aliases preserve local exceptions and inherit frame options through export (9.628459ms)
+✔ popup aliases share the base/native namespace and reject malformed metadata (4.013588ms)
+✔ popup alias validation applies existing override and central binding protections (1.252837ms)
+✔ popup aliases reject unsupported or nested native popup configurations (0.841678ms)
+✔ route indexing validates alias metadata without resolving unopened contents (0.356518ms)
+✔ popup routes reject a Bubble popup frame introduced by a shared binding (0.673214ms)
+✔ shared colors update both layouts without changing presentation (0.367233ms)
+✔ local layout overrides work but cannot shadow central settings (0.401435ms)
+✔ missing dependencies and unsafe paths fail visibly (0.340523ms)
+✔ central people support different field names and renaming (0.41168ms)
+✔ dashboard discovery finds section cards and nested cards, not config types (0.369326ms)
+✔ export roundtrip preserves person bindings and resource dependencies (3.933341ms)
+✔ change preview finds every layout affected by a shared color (0.930012ms)
+✔ new template IDs work on plain HTTP where randomUUID is unavailable (4.142602ms)
+✔ invalid imports reject missing values, blank names, invalid dependencies and ambiguous bindings (2.245653ms)
+✔ shared values and local overrides cannot inject recursive library cards (0.543719ms)
+✔ binding paths cannot write primitive values, array properties or sparse indices (0.414234ms)
+✔ missing inherited names do not resolve to prototype entries (0.209506ms)
+✔ non-finite numbers, unsafe nested keys and excessive nesting are rejected (1.172517ms)
+✔ design-only keeps information local while later design changes propagate (1.332748ms)
+✔ design-only preserves local information and resets an existing local design override (0.532061ms)
+✔ mixed entity inheritance retains one entity locally and updates the other (0.262976ms)
+✔ nested central binding does not accidentally lock sibling information (0.759234ms)
+✔ design presets support empty containers and null without sharing mutable data (0.685232ms)
+✔ design metadata survives exports and rejects invalid or overlapping fields (2.505115ms)
+✔ design fields supplied by central bindings validate against the resolved configuration (0.747777ms)
+✔ relinking one child of a locally held list retains all other local entries (1.052876ms)
+✔ editing a nested local field preserves sibling overrides in parent objects (0.480034ms)
+✔ import rejects null optional lists consistently with the backend (0.414415ms)
+✔ design paths distinguish numeric array indices from object keys (1.149883ms)
+✔ malformed local override collections have a recoverable validation error (0.612443ms)
+✔ change comparison recognizes additions and removals with inherited-property names (0.157878ms)
+✔ mixed local inheritance preserves siblings across 200 varied nested-list edits and resets (64.252478ms)
+✔ design-only handles deeply nested non-design content without generating oversized paths (1.055371ms)
+✔ deep shared values are validated after insertion into the target card (0.523519ms)
+✔ native local editor changes only changed fields and preserves explicit local snapshots (0.557691ms)
+✔ native local editor can add and remove optional settings without losing other overrides (0.435827ms)
+✔ native array editor can change unbound entries while central values remain protected (0.518281ms)
+✔ removing an array element cannot shift centrally bound entries (0.1593ms)
+✔ complete nested stacks survive export and resolve with all child settings (0.262316ms)
+✔ footer templates roundtrip and central navigation edits reach all references (0.374194ms)
+✔ relinking one child of a locally replaced object preserves omitted sibling deletions (0.300533ms)
+✔ relinking or adding a child below a removed object keeps siblings removed (0.533403ms)
+✔ relinking a child of a shortened local list preserves its length (0.446763ms)
+✔ design-only preset preserves existing local field removals outside marked design (0.326272ms)
+✔ design-only preset restores nested design while preserving removed sibling fields (0.411741ms)
+✔ editor cannot hide a protected list truncation by restoring its last binding (0.213802ms)
+✔ editor cannot hide deletion of a single-item list with a protected child binding (0.18589ms)
+✔ editor roundtrips 1584 combinations of inherited local and edited container types (135.755761ms)
+✔ relinking a local object child above a scalar template preserves local siblings (0.50458ms)
+✔ design presets preserve 121 local type combinations and entity removals during central updates (14.914343ms)
+✔ editing and removing local list entries roundtrips all positions across 30 list-length pairs (11.87889ms)
+✔ editing fields in expanded local stack lists keeps other cards intact (0.580115ms)
+✔ relinking local list entries handles all positions across 25 list-length pairs (5.44195ms)
+✔ adding or relinking a child below a scalar local object replacement preserves missing siblings (1.156032ms)
+✔ 3000 seeded nested configurations preserve complete local editor results (194.117668ms)
+✔ popup hash metadata survives export/import and never becomes card configuration (0.566023ms)
+✔ popup routes reject duplicates unsafe hashes and reserved options (0.319361ms)
+✔ popup route accepts an original standalone Bubble popup without changing its configuration (0.412181ms)
+✔ native standalone and classic stack popup hashes provide automatic routes (0.440784ms)
+✔ native popup drafts need no hash while assigned routes require supported original framing (0.694767ms)
+✔ legacy native popup headers remain backward compatible ordinary templates without taking a hash route (0.439502ms)
+✔ automatic and explicit native popup hashes share one strict duplicate namespace (0.302246ms)
+✔ native popup route lookup resolves only its structural binding paths (0.273762ms)
+✔ shared bindings cannot expand a compact library beyond the resolved card budget (32.971762ms)
+✔ oversized alias expansions are rejected before import cloning or aggregate serialization (0.483609ms)
+✔ temporary borrowed local overrides preserve independent values and cannot mutate input (8.764417ms)
+✔ memoized JSON validation retains depth checks for deeper shared occurrences and rejects cycles (0.828258ms)
+✔ direct card validation rejects oversized aliases before recursive card checks (2.40266ms)
+✔ person colors require a complete six-digit hex string without coercion or trailing newline (0.565161ms)
+✔ editing and relinking an ordered local list cannot resurrect its removed card (0.904954ms)
+✔ ordered nested object overrides retain effective siblings while one field is relinked (0.375476ms)
+✔ editing after raw indexed removals retains every other card and its central updates (0.561616ms)
+✔ ambiguous raw-list field relinking fails without changing data and allows whole-list recovery (0.513444ms)
+ℹ tests 74
+ℹ suites 0
+ℹ pass 74
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 550.766243
+✔ all centrally saved alias hashes count as template usages for deletion protection (3.117548ms)
+✔ native popup hashes protect templates used only by a dashboard button (0.240603ms)
+✔ dashboard scan includes default, sections and readable YAML dashboards, reports failures (1.238466ms)
+✔ dependency report handles nested cards, entity lists and cache-busting URLs (0.771483ms)
+✔ scan handles malformed dashboard and resource API responses without crashing (0.244468ms)
+✔ semantic resource query parameters are retained while version parameters are ignored (0.489167ms)
+✔ library references in custom wrapper fields are counted for deletion checks (0.382947ms)
+✔ popup actions and saved hash routes count actual uses without duplicate ancestor stacks (1.94478ms)
+✔ popup usage matches browser-normalized YAML navigation hashes without matching another origin (0.408796ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 14.942385
+✔ native graphical editor changes are saved with people and template configuration (10.754225ms)
+✔ person binding is created through graphical controls and native editor cannot overwrite it (3.586364ms)
+✔ existing dashboard card can be copied into a template without modifying dashboard (19.022995ms)
+✔ save refuses imported deletion of templates used by dashboards (0.964894ms)
+✔ change comparison renders both saved and draft layouts (1.125446ms)
+✔ central color map can add a missing calendar field through the graphical controls (0.565442ms)
+✔ empty template selector gives admins direct access to creation and import (0.858704ms)
+✔ new custom template uses the card stub instead of an invalid type-only config (2.228308ms)
+✔ saved template can be used directly and preview updates after native edits (228.05411ms)
+✔ library manager supplies a graphical config editor (0.264489ms)
+✔ connection replacement clears stale signature and restores the same dashboard card (1.19495ms)
+✔ inactive integration disables cards and preserves an unsaved manager draft (0.736289ms)
+✔ failed subscription can be retried without refreshing the page (0.609087ms)
+✔ lazy card rebuild is handled locally and updates the rendered child (0.801578ms)
+✔ invalid native editor payload cannot corrupt the previously valid draft (0.83585ms)
+✔ overlapping asynchronous card renders cannot show an older config (0.963351ms)
+✔ restoration retains the original revision while a concurrent update arrives during scan (1.331977ms)
+✔ overlapping async management actions are blocked until the first completes (0.250147ms)
+✔ graphical design marking is saved and can be removed (3.541817ms)
+✔ graphical design preset, field inheritance and full reset control the rendered config (7.328433ms)
+✔ design preset without marked fields gives an actionable error and preserves local values (1.557547ms)
+✔ duplicate keeps design, bindings and dependencies independent of source (1.270004ms)
+✔ template deletion is blocked for dashboard use but unused templates can be removed (0.847197ms)
+✔ creating and deleting people works while referenced people and groups remain protected (1.008369ms)
+✔ import draft uses current revision and can be discarded without losing saved templates (0.805634ms)
+✔ history can be loaded as a draft without changing the saved library (0.647926ms)
+✔ non-admin users can select templates but cannot open management (0.538231ms)
+✔ resource assignments support manual URLs, installed choices, deduplication and removal (8.319987ms)
+✔ shared setting creation, rebinding and unlinking preserve the currently effective value (5.557864ms)
+✔ local field actions cannot change centrally bound values (0.984954ms)
+✔ import cancellation preserves an unsaved draft (0.354664ms)
+✔ invalid local paths can be reset graphically after template structure changes (1.40731ms)
+✔ new central binding conflicting with old local overrides still allows full reset (0.544711ms)
+✔ native config events without details do not throw or modify the draft (0.625893ms)
+✔ an old asynchronous render failure cannot replace a newer successful card (0.528306ms)
+✔ preview labels survive both successful rendering and configuration errors (0.73012ms)
+✔ hass updates reach the actual preview card while labels remain intact (0.26553ms)
+✔ failed central binding is atomic and leaves configuration and bindings intact (0.372761ms)
+✔ used imported template named toString cannot bypass deletion protection (0.373272ms)
+✔ a formatted export larger than 2 MB remains importable when compact library is within limit (50.75232ms)
+✔ successful restore remains acknowledged when refreshing history fails (1.057373ms)
+✔ adding a field after the selected parent disappeared gives a recoverable message (1.395283ms)
+✔ obsolete design marks can be removed even when the original field no longer exists (0.806946ms)
+✔ events from a detached card picker cannot add unexpected templates (0.483648ms)
+✔ original editor survives title typing and echoed HA setConfig without rebuilding (5.062438ms)
+✔ incoming library updates preserve an unsaved native editor and show the revision conflict (3.372111ms)
+✔ direct YAML import adds one card and retains existing templates and the full configuration (1.297155ms)
+✔ invalid YAML keeps the pasted text available for correction (0.405291ms)
+✔ navigation groups creation and maintenance actions into closed menus (0.335796ms)
+✔ save status updates without rebuilding the native editor and only enables for dirty drafts (0.913957ms)
+✔ advanced controls stay open after selecting a field and template actions are grouped (0.646985ms)
+✔ HA built-in choices are available without loading the native picker or customCards (0.790371ms)
+✔ official HA editor host receives the actual built-in configuration and its changes are saved (0.51815ms)
+✔ late registered custom editors are awaited before setConfig is called (1.208721ms)
+✔ original editor receives dashboard config rather than the Lovelace controller (0.184208ms)
+✔ HA form-based card uses the original HA form editor and schema (0.310758ms)
+✔ original editor initialization and error events do not modify the template (0.518021ms)
+✔ footer uses the original inner editor and retains width after edits (0.29886ms)
+✔ footer renderer limits width and forwards only the inner card to HA (0.603689ms)
+✔ footer can be saved even when its original editor cannot load (1.576635ms)
+✔ insertion and central configuration are separate workflows (1.149753ms)
+✔ switching workflows retains local settings and an unsaved central draft (0.975079ms)
+✔ local editor writes only reference overrides and leaves the central library intact (0.918123ms)
+✔ non-admins only see insertion and cannot retain a configuration panel (0.345901ms)
+✔ workflow tabs can be changed using arrow keys (0.522658ms)
+✔ calendar-style sections retain their open state when the manager rerenders (0.274023ms)
+✔ form controls have associated labels and nested section contents (0.575757ms)
+✔ native editor is isolated from library styles without losing its config events (0.698873ms)
+✔ field selection reopens advanced controls while preserving other disclosures (0.713025ms)
+✔ closed preview and local-editor sections do not instantiate expensive cards (0.524931ms)
+✔ manager retains the original editor across menu rebuilds and attaches one current listener (1.118536ms)
+✔ hidden advanced configuration and dependency reports are built only when opened (1.086808ms)
+✔ preview requests reuse unchanged rendered cards but rebuild on changed configuration (0.402887ms)
+✔ cached editor is updated after a central push and switches correctly to another template (2.760901ms)
+✔ reopening a hidden preview catches up after editing while it was closed (0.585292ms)
+✔ closed preview cards do not receive background hass updates and recover on reopening (0.486203ms)
+✔ overlapping menu renders share the in-flight original editor factory (0.518701ms)
+✔ dashboard central changes reuse native setConfig and keep local overrides (0.771373ms)
+✔ dashboard changes recreate unsupported or throwing cards and changed card types (0.462357ms)
+✔ dashboard equal config echoes skip resolution and card creation (0.219761ms)
+✔ shared dashboard resolutions isolate mutating cards and refresh bound person values (0.673174ms)
+✔ footer width changes reuse inner card and its state (0.474895ms)
+✔ native update emitting rebuild cannot overwrite the replacement render (0.430148ms)
+✔ local style UI adds multiline card-mod without changing central template and can relink (2.292219ms)
+✔ local style UI supports style_ha_card and nested stack paths while protecting bindings (1.242492ms)
+✔ complete local YAML accepts arbitrary design objects lists actions and field deletions (2.530073ms)
+✔ complete local YAML preserves protected bindings and rejects root card type changes (0.824513ms)
+✔ complete local YAML rejects stale and malformed results without losing current overrides (0.950913ms)
+✔ card-mod additions changes and removals rerun the HA factory instead of native setConfig (0.667076ms)
+✔ nested stack card-mod changes rebuild the real stack and preserve all local configuration (0.581136ms)
+✔ footer card-mod changes rerun inner factory while ordinary styles reach native setConfig (0.344489ms)
+✔ arbitrary local UI extension fields rerun the HA factory with the complete resolved config (0.344479ms)
+✔ slow local editor factory receives latest overrides after YAML or style edits (0.633054ms)
+✔ slow central editor factory receives latest draft fields (2.871276ms)
+✔ footer handles immediate rebuild during initial hass assignment (0.391129ms)
+✔ original editor cache reflects config before synchronous change echoes and recovers on errors (0.590951ms)
+✔ footer original editor receives changing Lovelace context (0.261004ms)
+✔ local style remains emitted when a third-party editor update throws (1.623716ms)
+✔ removed native child upgrade does not receive the current hass object (0.353903ms)
+✔ unchanged preview reuse retains functional ll-rebuild with the latest snapshot (0.351139ms)
+✔ shared resolution cache cannot turn malformed overrides into valid empty overrides (0.51774ms)
+✔ reference and footer adapters preserve zero card size for hidden child cards (0.417349ms)
+✔ native local editor rejects protected list truncation then accepts a valid sibling edit (1.160628ms)
+✔ central native editor cannot reconstruct a removed protected list item incompletely (1.312719ms)
+✔ equivalent reference changes do not force a later unrelated central card rebuild (0.656038ms)
+✔ local style UI can modify a middle card in an expanded local stack (1.196232ms)
+✔ unapplied local YAML text survives library rerenders and still detects stale configuration (0.614717ms)
+✔ unapplied local CSS and target survive library rerenders (0.65709ms)
+✔ explicit reset clears unapplied YAML and CSS drafts (0.545632ms)
+✔ external template changes discard old local paths and drafts and choose the footer style target (0.470529ms)
+✔ a failing library editor cannot interrupt central updates to other dashboard references (0.373042ms)
+✔ dashboard loading inspects the requested template before helpers and never resolves unused templates (0.31181ms)
+✔ distinct local references share one template dependency check per snapshot (0.687416ms)
+✔ warm template cache cannot conceal deletion changed bindings or missing dependencies (0.705022ms)
+✔ missing requested template or bound group never loads HA card helpers (0.304529ms)
+✔ popup UI generates a reference action with local overrides and original Bubble options (0.878845ms)
+✔ insertion shows the saved native popup hash and normal button separately from local settings (0.874868ms)
+✔ insertion uses the effective metadata hash and follows central route changes (0.605973ms)
+✔ popup button output refreshes after native local edits without rebuilding that editor (1.55336ms)
+✔ popup options show inherited native values and clearing a local value restores inheritance (0.549137ms)
+✔ two own hashes can be saved for one template with separate local overrides (4.985523ms)
+✔ saved hash output waits for current local edits to be saved and uses current overrides (3.164178ms)
+✔ removing an unused alias keeps its template and other routes (3.197243ms)
+✔ an alias used by a dashboard button cannot be removed or renamed (4.105166ms)
+✔ nonadmins can use saved aliases but cannot save library links (0.583619ms)
+✔ alias save from an old HA connection cannot overwrite the new library (0.90285ms)
+✔ duplicate aliases and conflicting central bindings are rejected before saving (1.463635ms)
+✔ duplicating a template never copies its alias hashes (0.840506ms)
+✔ alias selection in central management retains every saved local override (1.253599ms)
+✔ alias edits cannot replace central changes made while dashboard checks are pending (6.471992ms)
+✔ a dirty manager shows the current saved hash separately from its central draft (0.756139ms)
+✔ switching templates clears alias metadata and popup option exceptions (0.67689ms)
+✔ direct popup actions contain only local options so central defaults stay live (0.303998ms)
+✔ switching templates during an alias save releases controls on the new template (1.20081ms)
+✔ a manager selection change during alias checks keeps the current native editor bound to the new draft (1.5063ms)
+✔ central popup hash UI stores and removes the route with the template (1.655064ms)
+✔ central popup hash UI rejects an existing hash without overwriting a route (0.59076ms)
+✔ duplicating a template does not copy its unique popup hash (0.659523ms)
+✔ native popup management provides only a hash button and retains the original editor (1.252397ms)
+✔ duplicating a native popup keeps central bindings and gives the copy a unique hash (1.547742ms)
+✔ popup content references remove only the native frame and follow central edits (0.602768ms)
+✔ deleting a native popup used only by a hash button is blocked (0.468055ms)
+✔ removed library card does not finish an asynchronous child creation (0.343247ms)
+✔ editing an old popup option after deleting its route cannot recreate or crash the route (0.556949ms)
+✔ removed footer cancels native child loading and resumes when reconnected (0.343848ms)
+✔ central native editor immediately restores attempted protected values in its visible form (0.61082ms)
+✔ local native editor immediately restores protected values while preserving allowed changes (0.74344ms)
+✔ central edits survive a native-editor failure while restoring protected values (1.016993ms)
+✔ local edits survive a native-editor failure while restoring protected values (0.879435ms)
+✔ oversized alias payloads from central native editors leave the draft intact (0.989111ms)
+✔ oversized alias payloads from local native editors leave the current settings intact (0.529658ms)
+✔ delayed save reply cannot replace a newer authoritative library snapshot (0.594967ms)
+✔ delayed restore reply cannot replace a newer authoritative library snapshot (0.657591ms)
+✔ save acknowledgements from the old HA connection retain the unconfirmed draft (0.546894ms)
+✔ a retained draft cannot be saved into another connection until explicitly reloaded (0.830151ms)
+✔ a connection change during deletion checks prevents sending the stale save (0.540044ms)
+✔ restore acknowledgements from an old connection cannot overwrite the new library (0.594386ms)
+✔ template deletion and imported removal protect explicit popup actions (0.586003ms)
+✔ template deletion protects saved popup hash even after its draft route was changed (0.560635ms)
+✔ native local editors can reorder unprotected keys without resynchronizing while typing (0.790161ms)
+✔ card-mod uses original HA hosts for references footer children and library previews (0.933537ms)
+✔ native-host construction falls back to the existing factory on older HA hosts (0.457409ms)
+✔ late rebuilds from loaded cards cannot restart removed references or footers (0.659414ms)
+ℹ tests 163
+ℹ suites 0
+ℹ pass 163
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 685.553797
+✔ all 43 supplied resource URLs match regardless of version parameters (13.950822ms)
+✔ resource comparison respects case-sensitive paths and origin (0.676259ms)
+✔ registered resource is not treated as proof that its card has loaded (0.334905ms)
+✔ discover library usages inside state-switch, tabs, auto-entities and stack wrappers (0.910662ms)
+✔ HA scan preserves the supplied resource list without treating helper modules as cards (0.835689ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 24.857016
+✔ importable library reproduces both complete user configurations without changing settings (4.229553ms)
+✔ calendar color update changes both real configurations and leaves all other settings intact (5.471374ms)
+✔ shared family rule colors and icons propagate while agenda retains its two-day option (3.86824ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 22.296006
+✔ native aliases retain distinct exceptions through A B A navigation and repeated signals (25.028764ms)
+✔ plain content aliases pass local exceptions into the live reference and inherit options (3.747847ms)
+✔ unopened aliases never resolve their content during router updates (2.746819ms)
+✔ removing the selected alias closes it while preserving the base and other aliases (4.522324ms)
+✔ alias updates inside the native factory discard obsolete exceptions and frame options (3.091038ms)
+✔ direct actions inherit central popup options while retaining explicit local exceptions (2.719107ms)
+✔ popup embeds a reference and preserves original Bubble options and local exceptions (0.522086ms)
+✔ a saved standalone Bubble popup supplies its original frame and linked content (0.199631ms)
+✔ standalone popup cards retain their original Bubble grid and sizing options (0.490599ms)
+✔ a saved legacy popup stack supplies its native header without nesting another popup (1.025735ms)
+✔ native saved popup hashes open without extra popup metadata or a dashboard card (2.04411ms)
+✔ changing between native and plain popup templates replaces the content mode (5.071783ms)
+✔ invalid popup configuration cannot replace renderer, content or hash (0.47781ms)
+✔ opens original Bubble on demand and HA state updates reach its instance (0.404419ms)
+✔ repeated opens retain one HA recipient and remove previous cards (1.358427ms)
+✔ missing Bubble resource does not modify the URL or create a card (0.518712ms)
+✔ older Bubble implementation fails visibly and cleans its host card (505.85517ms)
+✔ missing templates and invalid protected overrides fail before rendering (0.621586ms)
+✔ closing during helper loading prevents a late popup (0.273202ms)
+✔ navigation during helper loading does not open on the next dashboard (0.306272ms)
+✔ closing through Bubble hash navigation cleans up after its transition (429.674365ms)
+✔ renderer initialization failures leave no card or changed URL (0.527755ms)
+✔ normal HA navigation hash opens a central template without a dashboard reference card (1.522935ms)
+✔ direct hash links wait for library data and unrelated hashes create nothing (2.637144ms)
+✔ duplicate URL signals do not rebuild an already opened popup (1.464927ms)
+✔ central popup options update the open original Bubble shell (2.745137ms)
+✔ removing a central route closes and removes its active popup (1.676026ms)
+✔ returning to the hash through forward navigation opens it again (2.74709ms)
+✔ routing cancels slow hash opens after navigation away (1.382523ms)
+✔ unsupported routed Bubble popup still reports its failure after URL cleanup (551.006924ms)
+✔ resource bootstrap receives the library even with no library cards in the dashboard (11.509225ms)
+✔ closing an old popup cannot navigate back from a new dashboard with the same hash (0.359441ms)
+✔ an obsolete failed validation cannot report an error after a later successful popup (0.316847ms)
+✔ failed hash requests can be retried with a normal second navigation click (2.688717ms)
+✔ browser page cache restores a hash popup without changing its URL on pagehide (3.413688ms)
+✔ null popup options fail validation instead of silently becoming defaults (0.144117ms)
+✔ a failing library callback cannot interrupt HA state propagation (0.273531ms)
+✔ invalid replacement leaves an existing working popup visible (0.387623ms)
+✔ temporarily unavailable library preserves the hash and reopens after recovery (2.70435ms)
+✔ connection changes invalidate an in-flight request validated against old library data (0.236286ms)
+✔ unavailable card helpers cannot remove an existing working popup (0.3525ms)
+✔ opening more-info in the same dashboard does not close or recreate the popup (432.294205ms)
+✔ same-dashboard query changes during loading do not lose the hash request (1.801302ms)
+✔ popup teardown is idempotent when disconnection synchronously asks to suspend (0.309055ms)
+✔ failed URL restoration still disconnects the temporary popup (0.389065ms)
+✔ popup outer styles use the HA original-card factory (0.325089ms)
+✔ HA error placeholders are rejected instead of mounted as Bubble popups (0.338109ms)
+✔ routed popups do not emit duplicate public HA navigation events (1.410673ms)
+✔ popup card_mod mounts the original hui-card host and forwards HA states to Bubble (0.41177ms)
+✔ handoff to a native popup does not disconnect the old shell behind the new scroll lock (861.253376ms)
+✔ quick native-popup handoff cancels disposal already scheduled by an initial close (430.516469ms)
+✔ temporary library loss does not tear down a held shell beneath a native popup (431.766304ms)
+✔ duplicate signals during a pending popup handoff preserve the new request (4.355255ms)
+✔ more-info changes during a pending popup handoff preserve the new request (4.697311ms)
+✔ replacing the HA root disposes a held popup before attaching the new state host (0.41848ms)
+✔ an explicit popup action replaces and disposes a shell held beneath a native popup (1.628181ms)
+✔ query changes during deferred Bubble initialization do not cancel an explicit popup (25.739124ms)
+✔ HA root replacement preserves a routed hash and reopens it through the new library connection (3.060908ms)
+✔ late states from the previous HA root cannot update or remove the current popup (1.685748ms)
+✔ native error placeholders preserve the working popup during replacement (0.441465ms)
+✔ native factory failures preserve the working popup during replacement (0.303557ms)
+✔ a foreign popup keeps its scroll lock when an older initializer is cancelled (41.735971ms)
+✔ replacement waits for deferred native teardown before opening a new scroll lock (12.173584ms)
+✔ close waits for deferred native teardown before opening a new scroll lock (12.248733ms)
+✔ app remount waits for deferred native teardown before opening a new scroll lock (11.936236ms)
+✔ native factory navigation cannot attach an obsolete popup on another dashboard (0.448305ms)
+✔ a popup requested by a synchronous close action takes priority over the older replacement (1.617104ms)
+✔ an HA app remount with the same library connection restores a routed popup (2.814967ms)
+✔ a routed popup finishing helper loading after an app remount binds to the current root (2.755979ms)
+✔ a native factory cannot attach its popup to an app root replaced during creation (0.32568ms)
+✔ an obsolete native hass error cannot cancel a newer popup requested during that update (1.564215ms)
+✔ fast A to B to A navigation ignores helpers completed out of order (6.160169ms)
+✔ central option updates during helper loading only create the current popup (5.022054ms)
+✔ central option updates inside the native factory discard its obsolete candidate (1.554259ms)
+✔ an app remount during deferred native initialization cannot publish an obsolete popup hash (24.756724ms)
+✔ native hass and URL restoration failures cannot interrupt HA state propagation (0.585882ms)
+ℹ tests 76
+ℹ suites 0
+ℹ pass 76
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3927.979205
+✔ resource cold-start opens a saved standalone popup with only its dashboard button (48.131195ms)
+✔ a saved legacy stack opens its content outside the dashboard and keeps stack styles (21.079225ms)
+✔ an explicit button action opens a saved native popup without a placed reference (33.787524ms)
+✔ native popup grids pass every column and row option to original Bubble wrappers (29.351322ms)
+✔ a manual popup waiting for helpers opens the latest central card configuration (33.830013ms)
+✔ a central switch between a native popup and plain content changes the actual renderer (30.873924ms)
+✔ a manual popup discards a factory candidate superseded by a central update (21.21885ms)
+✔ two central hash aliases render independent native entities and styles with only buttons (51.581334ms)
+✔ plain and legacy aliases retain live library references with their own local exceptions (55.489387ms)
+✔ a manual popup factory cannot publish stale inherited central options (21.019791ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 353.106776
+
+COMMAND: python -m unittest discover -s tests -p 'test_*.py' -v
+test_invalid_restoration_is_rejected_without_mutating_state (test_backend.BackendLifecycleTest.test_invalid_restoration_is_rejected_without_mutating_state) ... ok
+test_nonadmin_cannot_save_restore_or_read_history (test_backend.BackendLifecycleTest.test_nonadmin_cannot_save_restore_or_read_history) ... ok
+test_reenable_restores_active_state_without_duplicate_resources (test_backend.BackendLifecycleTest.test_reenable_restores_active_state_without_duplicate_resources) ... ok
+test_unload_blocks_reads_and_writes_without_deleting_data (test_backend.BackendLifecycleTest.test_unload_blocks_reads_and_writes_without_deleting_data) ... ok
+test_aliases_persist_broadcast_and_restore_without_local_card_copies (test_backend.BackendPopupLinksTest.test_aliases_persist_broadcast_and_restore_without_local_card_copies) ... ok
+test_invalid_duplicate_alias_does_not_publish_or_replace_existing_library (test_backend.BackendPopupLinksTest.test_invalid_duplicate_alias_does_not_publish_or_replace_existing_library) ... ok
+test_loading_saved_aliases_preserves_options_and_override_metadata (test_backend.BackendPopupLinksTest.test_loading_saved_aliases_preserves_options_and_override_metadata) ... ok
+test_invalid_stored_state_does_not_register_resources_or_overwrite_data (test_backend.BackendSetupAndSubscriptionTest.test_invalid_stored_state_does_not_register_resources_or_overwrite_data) ... ok
+test_legacy_saved_library_is_normalized_at_setup (test_backend.BackendSetupAndSubscriptionTest.test_legacy_saved_library_is_normalized_at_setup) ... ok
+test_resource_registration_failure_does_not_publish_half_initialized_state (test_backend.BackendSetupAndSubscriptionTest.test_resource_registration_failure_does_not_publish_half_initialized_state) ... ok
+test_subscription_sends_initial_state_and_uses_unsubscribe_cleanup (test_backend.BackendSetupAndSubscriptionTest.test_subscription_sends_initial_state_and_uses_unsubscribe_cleanup) ... ok
+test_concurrent_saves_reject_stale_revision (test_backend.BackendTest.test_concurrent_saves_reject_stale_revision) ... ok
+test_ha_swallowed_restore_write_failure_preserves_current_library (test_backend.BackendTest.test_ha_swallowed_restore_write_failure_preserves_current_library) ... ok
+test_ha_swallowed_write_failure_is_reported_without_activating_revision (test_backend.BackendTest.test_ha_swallowed_write_failure_is_reported_without_activating_revision) ... ok
+test_invalid_save_does_not_mutate_store (test_backend.BackendTest.test_invalid_save_does_not_mutate_store) ... ok
+test_parent_store_return_without_completed_write_cannot_activate_revision (test_backend.BackendTest.test_parent_store_return_without_completed_write_cannot_activate_revision) ... ok
+test_read_only_ha_store_does_not_acknowledge_unsaved_revision (test_backend.BackendTest.test_read_only_ha_store_does_not_acknowledge_unsaved_revision) ... ok
+test_restore_and_stale_restore (test_backend.BackendTest.test_restore_and_stale_restore) ... ok
+test_shutdown_during_running_write_acknowledges_only_after_durable_completion (test_backend.BackendTest.test_shutdown_during_running_write_acknowledges_only_after_durable_completion) ... ok
+test_shutdown_rejects_save_before_buffering_and_allows_a_later_retry (test_backend.BackendTest.test_shutdown_rejects_save_before_buffering_and_allows_a_later_retry) ... ok
+test_storage_failure_keeps_old_state (test_backend.BackendTest.test_storage_failure_keeps_old_state) ... ok
+test_invalid_or_noncard_yaml_is_rejected (test_backend.CardYamlTest.test_invalid_or_noncard_yaml_is_rejected) ... ok
+test_regular_yaml_aliases_preserve_card_configuration (test_backend.CardYamlTest.test_regular_yaml_aliases_preserve_card_configuration) ... ok
+test_yaml_alias_expansion_is_rejected_at_the_library_size_limit (test_backend.CardYamlTest.test_yaml_alias_expansion_is_rejected_at_the_library_size_limit) ... ok
+test_yaml_endpoint_does_not_write_and_allows_authenticated_local_editors (test_backend.CardYamlTest.test_yaml_endpoint_does_not_write_and_allows_authenticated_local_editors) ... ok
+test_yaml_preserves_card_entities_and_settings (test_backend.CardYamlTest.test_yaml_preserves_card_entities_and_settings) ... ok
+test_footer_invalid_card_width_and_unknown_envelope_are_rejected (test_backend.FooterYamlTest.test_footer_invalid_card_width_and_unknown_envelope_are_rejected) ... ok
+test_user_footer_yaml_preserves_width_stack_actions_and_templates (test_backend.FooterYamlTest.test_user_footer_yaml_preserves_width_stack_actions_and_templates) ... ok
+test_whole_horizontal_stack_retains_nested_ha_and_custom_cards (test_backend.StackYamlTest.test_whole_horizontal_stack_retains_nested_ha_and_custom_cards) ... ok
+test_history_extra_fields_are_removed_and_timestamps_normalized_in_memory (test_backend.StoredHistoryIntegrityTest.test_history_extra_fields_are_removed_and_timestamps_normalized_in_memory) ... ok
+test_invalid_history_order_or_revision_does_not_overwrite_storage (test_backend.StoredHistoryIntegrityTest.test_invalid_history_order_or_revision_does_not_overwrite_storage) ... ok
+test_invalid_history_timestamp_does_not_overwrite_storage (test_backend.StoredHistoryIntegrityTest.test_invalid_history_timestamp_does_not_overwrite_storage) ... ok
+test_design_field_created_by_binding_is_valid (test_model.DesignFieldsTest.test_design_field_created_by_binding_is_valid) ... ok
+test_design_metadata_preserved_in_history_and_public_state (test_model.DesignFieldsTest.test_design_metadata_preserved_in_history_and_public_state) ... ok
+test_invalid_design_metadata_is_rejected (test_model.DesignFieldsTest.test_invalid_design_metadata_is_rejected) ... ok
+test_valid_nested_and_list_design_paths (test_model.DesignFieldsTest.test_valid_nested_and_list_design_paths) ... ok
+test_bounded_history_and_restore_creates_new_revision (test_model.HistoryAndPeopleTest.test_bounded_history_and_restore_creates_new_revision) ... ok
+test_migrate_legacy_and_hide_history (test_model.HistoryAndPeopleTest.test_migrate_legacy_and_hide_history) ... ok
+test_nested_library_card_and_bad_dependency (test_model.HistoryAndPeopleTest.test_nested_library_card_and_bad_dependency) ... ok
+test_people_color_binding_and_missing_reference (test_model.HistoryAndPeopleTest.test_people_color_binding_and_missing_reference) ... ok
+test_aliases_reject_unsupported_or_nested_native_popup_frames (test_model.PopupLinksValidationTest.test_aliases_reject_unsupported_or_nested_native_popup_frames) ... ok
+test_base_and_alias_routes_have_one_global_duplicate_namespace (test_model.PopupLinksValidationTest.test_base_and_alias_routes_have_one_global_duplicate_namespace) ... ok
+test_bound_content_is_revalidated_after_central_changes (test_model.PopupLinksValidationTest.test_bound_content_is_revalidated_after_central_changes) ... ok
+test_central_group_updates_remain_linked_while_local_siblings_are_retained (test_model.PopupLinksValidationTest.test_central_group_updates_remain_linked_while_local_siblings_are_retained) ... ok
+test_invalid_link_metadata_and_options_are_rejected (test_model.PopupLinksValidationTest.test_invalid_link_metadata_and_options_are_rejected) ... ok
+test_invalid_override_paths_values_and_recursive_cards_are_rejected (test_model.PopupLinksValidationTest.test_invalid_override_paths_values_and_recursive_cards_are_rejected) ... ok
+test_links_survive_public_state_history_and_restore_without_resolved_copies (test_model.PopupLinksValidationTest.test_links_survive_public_state_history_and_restore_without_resolved_copies) ... ok
+test_local_expansion_cannot_exceed_card_size_limit (test_model.PopupLinksValidationTest.test_local_expansion_cannot_exceed_card_size_limit) ... ok
+test_multiple_aliases_need_no_base_route_and_preserve_original_configuration (test_model.PopupLinksValidationTest.test_multiple_aliases_need_no_base_route_and_preserve_original_configuration) ... ok
+test_native_base_hash_and_multiple_aliases_remain_separate (test_model.PopupLinksValidationTest.test_native_base_hash_and_multiple_aliases_remain_separate) ... ok
+test_ordered_overrides_and_style_changes_do_not_change_source_or_alias_values (test_model.PopupLinksValidationTest.test_ordered_overrides_and_style_changes_do_not_change_source_or_alias_values) ... ok
+test_shared_bindings_and_shared_list_structure_cannot_be_overridden (test_model.PopupLinksValidationTest.test_shared_bindings_and_shared_list_structure_cannot_be_overridden) ... ok
+test_valid_native_and_classic_frames_keep_original_design_and_grid (test_model.PopupLinksValidationTest.test_valid_native_and_classic_frames_keep_original_design_and_grid) ... ok
+test_duplicate_hash_is_rejected (test_model.PopupValidationTest.test_duplicate_hash_is_rejected) ... ok
+test_invalid_popup_routes_are_rejected (test_model.PopupValidationTest.test_invalid_popup_routes_are_rejected) ... ok
+test_legacy_popup_headers_remain_backward_compatible_without_claiming_hashes (test_model.PopupValidationTest.test_legacy_popup_headers_remain_backward_compatible_without_claiming_hashes) ... ok
+test_native_hashes_and_explicit_routes_share_a_duplicate_namespace (test_model.PopupValidationTest.test_native_hashes_and_explicit_routes_share_a_duplicate_namespace) ... ok
+test_native_popup_drafts_can_be_saved_without_assigning_a_route (test_model.PopupValidationTest.test_native_popup_drafts_can_be_saved_without_assigning_a_route) ... ok
+test_native_popup_hashes_and_frames_follow_shared_bindings (test_model.PopupValidationTest.test_native_popup_hashes_and_frames_follow_shared_bindings) ... ok
+test_original_native_popups_route_without_metadata_and_remain_unchanged (test_model.PopupValidationTest.test_original_native_popups_route_without_metadata_and_remain_unchanged) ... ok
+test_popup_metadata_is_preserved (test_model.PopupValidationTest.test_popup_metadata_is_preserved) ... ok
+test_shared_binding_cannot_turn_popup_content_into_another_popup (test_model.PopupValidationTest.test_shared_binding_cannot_turn_popup_content_into_another_popup) ... ok
+test_unsupported_native_popups_remain_normal_templates_until_explicitly_assigned (test_model.PopupValidationTest.test_unsupported_native_popups_remain_normal_templates_until_explicitly_assigned) ... ok
+test_normal_repeated_bindings_remain_valid_and_do_not_mutate_inputs (test_model.ResolvedBindingSizeTest.test_normal_repeated_bindings_remain_valid_and_do_not_mutate_inputs) ... ok
+test_repeated_bindings_are_bounded_without_copying_each_group (test_model.ResolvedBindingSizeTest.test_repeated_bindings_are_bounded_without_copying_each_group) ... ok
+test_group_insertion_cannot_exceed_resolved_card_depth_limit (test_model.ResolvedDepthTest.test_group_insertion_cannot_exceed_resolved_card_depth_limit) ... ok
+test_append_binding_and_dual_reference_validation (test_model.RobustValidationTest.test_append_binding_and_dual_reference_validation) ... ok
+test_nonfinite_unsafe_keys_and_deep_values_rejected (test_model.RobustValidationTest.test_nonfinite_unsafe_keys_and_deep_values_rejected) ... ok
+test_path_into_primitive_and_sparse_list_is_rejected (test_model.RobustValidationTest.test_path_into_primitive_and_sparse_list_is_rejected) ... ok
+test_resolved_group_cannot_inject_recursive_card (test_model.RobustValidationTest.test_resolved_group_cannot_inject_recursive_card) ... ok
+test_unicode_size_counts_utf8_not_ascii_escapes (test_model.RobustValidationTest.test_unicode_size_counts_utf8_not_ascii_escapes) ... ok
+test_circular_reference_is_rejected_immediately (test_model.SharedYamlStructureTest.test_circular_reference_is_rejected_immediately) ... ok
+test_reused_subtree_is_validated_once (test_model.SharedYamlStructureTest.test_reused_subtree_is_validated_once) ... ok
+test_serialized_alias_expansion_is_bounded_before_copying (test_model.SharedYamlStructureTest.test_serialized_alias_expansion_is_bounded_before_copying) ... ok
+test_subtree_reused_at_deeper_path_still_checks_depth (test_model.SharedYamlStructureTest.test_subtree_reused_at_deeper_path_still_checks_depth) ... ok
+test_conflicting_bindings (test_model.ValidationTest.test_conflicting_bindings) ... ok
+test_library_size_limit (test_model.ValidationTest.test_library_size_limit) ... ok
+test_recursive_template_and_unsafe_path (test_model.ValidationTest.test_recursive_template_and_unsafe_path) ... ok
+test_referenced_group_cannot_be_deleted (test_model.ValidationTest.test_referenced_group_cannot_be_deleted) ... ok
+test_valid_custom_card_and_group (test_model.ValidationTest.test_valid_custom_card_and_group) ... ok
+test_account_switch_is_detected_before_further_remote_writes (test_publication.PublicationTest.test_account_switch_is_detected_before_further_remote_writes) ... ok
+test_case_insensitive_existing_catalogue_entry_is_not_duplicated (test_publication.PublicationTest.test_case_insensitive_existing_catalogue_entry_is_not_duplicated) ... ok
+test_catalogue_addition_is_sorted_and_only_adds_one_entry (test_publication.PublicationTest.test_catalogue_addition_is_sorted_and_only_adds_one_entry) ... ok
+test_changed_upstream_attestations_require_review (test_publication.PublicationTest.test_changed_upstream_attestations_require_review) ... ok
+test_complete_publication_orders_checks_before_release_and_submission (test_publication.PublicationTest.test_complete_publication_orders_checks_before_release_and_submission) ... GitHub-Prüfungen abwarten. Bei Fehlern stoppt der Ablauf vor Release und Antrag.
+ok
+test_dry_run_has_no_local_or_remote_side_effects (test_publication.PublicationTest.test_dry_run_has_no_local_or_remote_side_effects) ... ok
+test_existing_release_for_another_commit_is_never_overwritten (test_publication.PublicationTest.test_existing_release_for_another_commit_is_never_overwritten) ... ok
+test_failed_gh_auth_is_not_treated_as_missing_repository (test_publication.PublicationTest.test_failed_gh_auth_is_not_treated_as_missing_repository) ... ok
+test_failed_workflow_stops_before_release (test_publication.PublicationTest.test_failed_workflow_stops_before_release) ... ok
+test_foreign_repository_branches_are_not_adopted_even_with_stale_zero_size (test_publication.PublicationTest.test_foreign_repository_branches_are_not_adopted_even_with_stale_zero_size) ... ok
+test_hacs_failure_in_full_flow_creates_neither_release_nor_request (test_publication.PublicationTest.test_hacs_failure_in_full_flow_creates_neither_release_nor_request) ... repository: https://github.com/owner/library-card
+commit: abc
+release: release-url
+checks: {'hacs': 'hacs.yml', 'hassfest': 'hassfest.yml', 'tests': 'tests.yml'}
+hacs_application: pr-url
+Der HACS-Antrag wird durch das HACS-Team geprüft; Einreichen bedeutet keine automatische Aufnahme.
+Projekt: /tmp/tmpwt55k7e4/Not Created
+Repository: <GitHub-Anmeldung>/library-card
+Release: v0.5.0
+MIT-Lizenz; lokale Tests → öffentliche GitHub-Prüfungen → Release → optional HACS-Antrag.
+GitHub-Prüfungen abwarten. Bei Fehlern stoppt der Ablauf vor Release und Antrag.
+ok
+test_invalid_names_cannot_be_used_as_commands_or_paths (test_publication.PublicationTest.test_invalid_names_cannot_be_used_as_commands_or_paths) ... ok
+test_local_dependency_install_and_git_commands_never_use_a_shell (test_publication.PublicationTest.test_local_dependency_install_and_git_commands_never_use_a_shell) ... ok
+test_no_submission_without_the_owners_documentation_acknowledgement (test_publication.PublicationTest.test_no_submission_without_the_owners_documentation_acknowledgement) ... ok
+test_release_archive_is_identical_after_file_timestamp_changes (test_publication.PublicationTest.test_release_archive_is_identical_after_file_timestamp_changes) ... ok
+test_release_created_before_checks_cannot_be_submitted (test_publication.PublicationTest.test_release_created_before_checks_cannot_be_submitted) ... ok
+test_restart_preserves_local_edits_and_paths_with_spaces (test_publication.PublicationTest.test_restart_preserves_local_edits_and_paths_with_spaces) ... ok
+test_staging_does_not_overwrite_unrelated_files (test_publication.PublicationTest.test_staging_does_not_overwrite_unrelated_files) ... ok
+test_success_with_skipped_jobs_is_not_accepted (test_publication.PublicationTest.test_success_with_skipped_jobs_is_not_accepted) ... ok
+test_successful_workflow_must_match_the_exact_commit (test_publication.PublicationTest.test_successful_workflow_must_match_the_exact_commit) ... ok
+test_upstream_format_changes_are_not_silently_rewritten (test_publication.PublicationTest.test_upstream_format_changes_are_not_silently_rewritten) ... ok
+test_verified_submission_fills_every_attestation_and_evidence_link (test_publication.PublicationTest.test_verified_submission_fills_every_attestation_and_evidence_link) ... ok
+test_browser_and_backend_accept_the_same_library_inputs (test_validation_parity.ValidationParityTest.test_browser_and_backend_accept_the_same_library_inputs) ... ok
+test_generated_local_yaml_roundtrips_with_real_parser (test_validation_parity.ValidationParityTest.test_generated_local_yaml_roundtrips_with_real_parser) ... ok
+
+----------------------------------------------------------------------
+Ran 104 tests in 1.350s
+
+OK
+
+OFFICIAL HASSFEST OUTPUT:
+Validating application_credentials... done in 0.00s
+Validating bluetooth... done in 0.00s
+Validating codeowners... done in 0.00s
+Validating conditions... done in 0.00s
+Validating config_schema... done in 0.00s
+Validating dependencies... done in 0.32s
+Validating dhcp... done in 0.00s
+Validating icons... done in 0.00s
+Validating integration_info... done in 0.00s
+Validating integration_type... done in 0.00s
+Validating json... done in 0.00s
+Validating labs... done in 0.00s
+Validating manifest... done in 0.00s
+Validating mqtt... done in 0.00s
+Validating quality_scale... done in 0.00s
+Validating requirements... done in 0.02s
+Validating services... done in 0.00s
+Validating ssdp... done in 0.00s
+Validating translations... done in 0.01s
+Validating triggers... done in 0.00s
+Validating usb... done in 0.00s
+Validating zeroconf... done in 0.00s
+Validating config_flow... done in 0.00s
+
+Integrations: 1
+Invalid integrations: 0
+
+
+ACTUAL LOCAL PREPARATION OUTPUT (sample owner, no upload):
+Lokale Prüfungen und isolierte Testabhängigkeiten …
+Lokal vorbereitet und geprüft: /tmp/Library Card Release Automation. Noch nichts auf GitHub veröffentlicht.

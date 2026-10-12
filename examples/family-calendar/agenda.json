@@ -1,0 +1,343 @@
+{
+  "title": "Familien Kalender",
+  "entities": [
+    "calendar.person_a",
+    "calendar.person_b",
+    "calendar.holidays",
+    "calendar.birthdays_a",
+    "calendar.birthdays_b",
+    "calendar.waste_collection",
+    "calendar.person_c",
+    "calendar.person_d"
+  ],
+  "default_view": "agenda",
+  "first_day_of_week": 1,
+  "week_days": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "week_start_hour": 5,
+  "week_end_hour": 23,
+  "lock_schedule_hours": false,
+  "hide_the_past": false,
+  "past_event_mode": "muted",
+  "disable_swipe_controls": true,
+  "show_all_events_month": false,
+  "show_all_details_month": false,
+  "month_day_tap_action": "show_events",
+  "hide_empty_days": false,
+  "agenda_compact_events": true,
+  "shorten_event_times": false,
+  "time_zone": "",
+  "display_full_weekday_names": true,
+  "week_compact_weekday_font_size": 12,
+  "week_compact_weekday_color": null,
+  "week_compact_day_header_spacing": 12,
+  "compact_width": true,
+  "show_current_time_bar": true,
+  "show_event_location": false,
+  "use_short_location": false,
+  "location_links": false,
+  "event_location_font_size": 10,
+  "background_opacity": 100,
+  "header_background_opacity": 100,
+  "event_calendar_friendly_name": false,
+  "event_title_prefix": "none",
+  "family_event_rules": [
+    {
+      "tag": "F",
+      "calendars": [
+        "calendar.person_a",
+        "calendar.person_b",
+        "calendar.person_c",
+        "calendar.person_d"
+      ],
+      "color_mode": "gradient",
+      "color": "#3cf642",
+      "background_mode": "neutral",
+      "background_color": "#D30D0D",
+      "width": 5
+    },
+    {
+      "tag": "S",
+      "calendars": [
+        "calendar.person_c"
+      ],
+      "color_mode": "gradient",
+      "color": "#3B82F6",
+      "background_mode": "primary",
+      "background_color": "#FFFFFF",
+      "width": 5
+    },
+    {
+      "tag": "Z",
+      "calendars": [
+        "calendar.person_d"
+      ],
+      "color_mode": "gradient",
+      "color": "#3B82F6",
+      "background_mode": "primary",
+      "background_color": "#FFFFFF",
+      "width": 5
+    },
+    {
+      "tag": "P",
+      "calendars": [
+        "calendar.person_a"
+      ],
+      "color_mode": "gradient",
+      "color": "#3B82F6",
+      "background_mode": "primary",
+      "background_color": "#FFFFFF",
+      "width": 5
+    },
+    {
+      "tag": "M",
+      "calendars": [
+        "calendar.person_b"
+      ],
+      "color_mode": "gradient",
+      "color": "#3B82F6",
+      "background_mode": "primary",
+      "background_color": "#FFFFFF",
+      "width": 5
+    }
+  ],
+  "hide_family_event_prefixes": true,
+  "combine_style": "bars",
+  "combine_indicator_gradient": false,
+  "combine_color_mode": "gradient",
+  "combine_color": "#3B82F6",
+  "combine_background": "#888888",
+  "event_color_mode": "left-tint",
+  "event_neutral_background": "#F8F3E9",
+  "event_tint_opacity": 80,
+  "event_color_bar_width": 5,
+  "day_badges": [],
+  "day_badge_layout_week": "inline",
+  "hide_calendars": false,
+  "hide_header": true,
+  "hide_year": false,
+  "period_date_format": "long",
+  "hide_controls": false,
+  "hide_navigation_buttons": false,
+  "hide_add_event_button": true,
+  "hide_view_selector": false,
+  "hide_dark_mode_toggle": true,
+  "show_dashboard_nav_button": false,
+  "header_dashboard_path": "/dashboard-test",
+  "header_dashboard_button_color": null,
+  "header_dashboard_tap_action": null,
+  "header_weather_sensor": "weather.weather_fusion_ai_vettweiss",
+  "show_daily_weather_forecast": true,
+  "header_items": [],
+  "header_nav_buttons": [
+    {
+      "icon": null,
+      "label": "Person C",
+      "path": "/daylight-kalender/aufgaben_sophie",
+      "color": "calendar:calendar.person_c"
+    }
+  ],
+  "calendar_person_entities": {},
+  "default_hidden_calendars": [],
+  "color_scheme": "auto",
+  "enable_event_management": true,
+  "event_modal_size": "medium",
+  "family_event_tag": "F",
+  "type": "custom:family-calendar-card",
+  "compact_height": true,
+  "compact_header": true,
+  "header_background_transparent": true,
+  "background_transparent": true,
+  "combine_calendars": true,
+  "use_24hr_schedule": true,
+  "language": "de",
+  "locale": "de-DE",
+  "calendar_names": {
+    "calendar.person_a": "Person A",
+    "calendar.person_b": "Person B"
+  },
+  "calendar_badge_icons": {
+    "calendar.work": "mdi:car"
+  },
+  "event_font_size": 16,
+  "hide_event_calendar_bubble": false,
+  "hide_times_for_calendars": [
+    "calendar.holidays",
+    "calendar.birthdays_a",
+    "calendar.birthdays_b",
+    "calendar.waste_collection"
+  ],
+  "readonly_calendars": [
+    "calendar.holidays",
+    "calendar.birthdays_a",
+    "calendar.birthdays_b",
+    "calendar.waste_collection"
+  ],
+  "hide_badge_calendars": [
+    "calendar.holidays",
+    "calendar.birthdays_a",
+    "calendar.birthdays_b",
+    "calendar.waste_collection"
+  ],
+  "virtual_calendars": [
+    {
+      "id": "familie",
+      "name": "Familie",
+      "icon": null,
+      "color": null,
+      "entities": []
+    }
+  ],
+  "event_styles": [
+    {
+      "match": {
+        "title": "Schwimmen"
+      },
+      "style": {
+        "icon": "mdi:pool",
+        "icon_position": "before_title",
+        "icon_size": "22px"
+      }
+    },
+    {
+      "match": {
+        "title": "Schule"
+      },
+      "style": {
+        "icon": "mdi:school",
+        "icon_position": "before_title",
+        "icon_size": "22px"
+      }
+    },
+    {
+      "match": {
+        "title": "Essen"
+      },
+      "style": {
+        "icon": "mdi:food",
+        "icon_position": "before_title",
+        "icon_size": "22px"
+      }
+    },
+    {
+      "match": {
+        "title": "Arzt"
+      },
+      "style": {
+        "icon": "mdi:stethoscope",
+        "icon_position": "before_title",
+        "icon_size": "22px"
+      }
+    },
+    {
+      "match": {
+        "title": {
+          "contains": "Geburtstag"
+        }
+      },
+      "style": {
+        "icon": "mdi:cake-variant",
+        "icon_position": "before_title",
+        "icon_size": "22px"
+      }
+    },
+    {
+      "match": {
+        "title": "Tanzen"
+      },
+      "style": {
+        "icon": "mdi:dance-ballroom",
+        "icon_position": "before_title",
+        "icon_size": "22px"
+      }
+    },
+    {
+      "match": {
+        "title": "Blockflöte"
+      },
+      "style": {
+        "icon": "mdi:music-note",
+        "icon_position": "before_title",
+        "icon_size": "22px"
+      }
+    },
+    {
+      "match": {
+        "title": "Garde"
+      },
+      "style": {
+        "icon": "mdi:party-popper",
+        "icon_position": "before_title",
+        "icon_size": "22px"
+      }
+    },
+    {
+      "match": {
+        "title": "Joggen"
+      },
+      "style": {
+        "icon": "mdi:weight-lifter",
+        "icon_position": "before_title",
+        "icon_size": "22px"
+      }
+    },
+    {
+      "match": {
+        "title": "Laufen"
+      },
+      "style": {
+        "icon": "mdi:weight-lifter",
+        "icon_position": "before_title",
+        "icon_size": "22px"
+      }
+    },
+    {
+      "match": {
+        "title": {
+          "contains": "Sport"
+        }
+      },
+      "style": {
+        "icon": "mdi:weight-lifter",
+        "icon_position": "before_title",
+        "icon_size": "22px"
+      }
+    }
+  ],
+  "event_time_font_size": 14,
+  "combine_calendars_width": 5,
+  "preference_storage_key": "",
+  "hide_calendar_names": false,
+  "height_scale": 1,
+  "header_color": "",
+  "header_text_color": "",
+  "grid_color": "",
+  "colors": {
+    "calendar.person_d": "#e2006e",
+    "calendar.birthdays_b": "#ffa07a"
+  },
+  "event_font_colors": {
+    "calendar.person_a": "#ffffff",
+    "calendar.person_b": "#ffffff",
+    "calendar.holidays": "#ffffff"
+  },
+  "header_time_sensor": "sensor.time",
+  "show_week_numbers_month": false,
+  "rolling_days_week_compact": null,
+  "week_number_prefix": "",
+  "idle_reset_minutes": 1,
+  "family_calendars": [
+    "calendar.person_a",
+    "calendar.person_b",
+    "calendar.person_c",
+    "calendar.person_d"
+  ],
+  "rolling_days_agenda": 2
+}

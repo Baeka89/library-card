@@ -1,0 +1,23 @@
+name: Fehler melden / Report a bug
+description: A reproducible problem in Library Card
+body:
+  - type: input
+    id: versions
+    attributes:
+      label: Versionen / Versions
+      description: Home Assistant, Library Card und betroffene Custom Card
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Schritte / Steps to reproduce
+      description: Erwartetes und tatsächliches Verhalten beschreiben.
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Konfiguration und Fehler / Configuration and errors
+      description: Nur relevante Ausschnitte. Zugangsdaten und private Inhalte entfernen.
+      render: yaml

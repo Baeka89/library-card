@@ -1,0 +1,13 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Library Card",
+        "description": "Zentrale Vorlagenbibliothek einrichten. Danach die JavaScript-Ressource hinzufügen; siehe Installationsanleitung."
+      }
+    },
+    "abort": {
+      "already_configured": "Library Card ist bereits eingerichtet."
+    }
+  }
+}
