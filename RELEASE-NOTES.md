@@ -1,19 +1,53 @@
-# v0.5.0
+# Library Card v0.5.0
 
-Erste öffentliche Veröffentlichung von Library Card. Die interne Entwicklung
-wird für GitHub bei `v0.5.0` zusammengeführt; Vorlagen und gespeicherte Daten
-verwenden weiterhin die Domain `card_library` und denselben Speicher.
+### English 🇺🇸
 
-- Karten und vollständige Stacks zentral als Vorlagen verwalten.
-- Originale HA-/Custom-Card-Editoren verwenden; YAML direkt übernehmen.
-- Gemeinsame Einstellungen, Personenfarben und lokale Ausnahmen verknüpfen.
-- Gestaltung, Entitäten und einzelne Felder flexibel übernehmen.
-- Originale Bubble-Popups über zentrale oder eigene Hash-Verknüpfungen öffnen.
-- Mehrere Hashes je Vorlage mit eigenen Entitäten, Styles und Popup-Einstellungen.
-- Import, Export, Verlauf, Wiederherstellung und Verwendungsprüfung.
-- Kurze Erklärungen sowie getrennte zentrale und lokale Arbeitsbereiche.
+#### Added
 
-Bubble-Popups benötigen Bubble Card ab 3.2.0. Custom Cards und card-mod werden
-separat installiert. Die Bibliothek bringt keine fremden Kartenimplementierungen
-mit. Nach einem Update die Ressource auf
-`/card_library/card-library.js?v=0.5.0` setzen und den Browser neu laden.
+- First public release of Library Card for Home Assistant.
+- Central templates for built-in cards, installed custom cards, complete stacks and supported header/footer configurations.
+- Original graphical card editors, direct YAML input and import of existing dashboard cards.
+- Linked reuse: central template changes update every linked use while preserving local exceptions.
+- Flexible inheritance of complete configurations, marked design fields or selected fields, with local entity and style overrides.
+- Shared groups and person colors across multiple templates.
+- Original Bubble Card popups opened through hash buttons without an extra dashboard card; multiple hash links with individual local settings.
+- JSON library import/export, history, restoration and checks for known dashboard uses before deleting templates.
+- Separate insertion and configuration workspaces, with German and English library UI.
+- HACS/Hassfest validation workflows and JavaScript/Python regression tests.
+
+#### Documentation
+
+- Bilingual README with language navigation, HACS installation, template and popup guides, support links and technical components.
+- Bilingual changelog and matching release notes.
+
+#### Requirements
+
+- Home Assistant 2024.7.0 or newer. Install custom cards and card-mod separately when used.
+- Bubble popups require Bubble Card 3.2.0 or newer with standalone popup support.
+- Existing library data retain the `card_library` domain and storage format. Resource: `/card_library/card-library.js?v=0.5.0`.
+
+### Deutsch 🇩🇪
+
+#### Hinzugefügt
+
+- Erste öffentliche Veröffentlichung von Library Card für Home Assistant.
+- Zentrale Vorlagen für HA-Karten, installierte Custom Cards, vollständige Stacks und unterstützte Kopf-/Fußzeilen.
+- Originale grafische Karteneditoren, direkte YAML-Eingabe und Übernahme vorhandener Dashboard-Karten.
+- Verknüpfte Verwendung: zentrale Änderungen aktualisieren alle Verwendungen; örtliche Ausnahmen bleiben erhalten.
+- Flexible Übernahme vollständiger Konfigurationen, markierter Designfelder oder ausgewählter Felder mit örtlichen Entitäts- und Style-Ausnahmen.
+- Gemeinsame Gruppen und Personenfarben für mehrere Vorlagen.
+- Originale Bubble-Card-Popups über Hash-Buttons ohne zusätzliche Dashboard-Karte; mehrere Hash-Verknüpfungen mit eigenen örtlichen Einstellungen.
+- JSON-Import/Export der Bibliothek, Verlauf, Wiederherstellung und Prüfung bekannter Dashboard-Verwendungen vor dem Löschen.
+- Getrennte Arbeitsbereiche für Einsetzen und Konfiguration sowie deutsche und englische Bibliotheksoberfläche.
+- HACS-/Hassfest-Prüfungen und JavaScript-/Python-Regressionstests.
+
+#### Dokumentation
+
+- Zweisprachige README mit Sprachwahl, HACS-Installation, Vorlagen- und Popup-Anleitungen, Unterstützung und technischen Komponenten.
+- Zweisprachiges Changelog und dazu passende Release-Beschreibung.
+
+#### Voraussetzungen
+
+- Home Assistant ab 2024.7.0. Genutzte Custom Cards und card-mod separat installieren.
+- Bubble-Popups benötigen Bubble Card ab 3.2.0 mit Standalone-Popup-Unterstützung.
+- Bestehende Bibliotheksdaten behalten Domain und Speicherformat `card_library`. Ressource: `/card_library/card-library.js?v=0.5.0`.
