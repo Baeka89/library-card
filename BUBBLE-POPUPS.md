@@ -1,4 +1,4 @@
-# Zentrale Vorlagen als Bubble-Popup – 0.5.0
+# Zentrale Vorlagen als Bubble-Popup – 0.5.1
 
 ## Bereits fertiges Bubble-Popup direkt verwenden
 
@@ -40,7 +40,7 @@ Bei zentralen Inhaltsänderungen bleibt der Popup-Rahmen bestehen. Eigenständig
 
 Dieser Abschnitt gilt für Vorlagen ohne eigenen Bubble-Popup-Rahmen. Für vollständige native Popup-Vorlagen gilt die Anleitung oben mit automatisch erkanntem Hash.
 
-1. Bibliothek 0.5.0 installieren, HA neu starten und die Modulressource auf `/card_library/card-library.js?v=0.5.0` aktualisieren. Browser neu laden.
+1. Bibliothek 0.5.1 installieren, HA neu starten und die Modulressource auf `/card_library/card-library.js?v=0.5.1` aktualisieren. Browser neu laden.
 2. In der Kartenbibliothek die gewünschte gespeicherte Vorlage bearbeiten.
 3. „Popup über #Hash öffnen“ öffnen und z. B. `#kalender` eintragen. Optional Titel und Desktop-Breite festlegen.
 4. „Zentrale Änderungen speichern“ drücken. Die Zuordnung liegt mit der Vorlage in der Integration, einschließlich Export/Import und Verlauf.
@@ -74,7 +74,7 @@ Beim Entfernen dieses Metadaten-Hashes und Speichern wird die separate Zuordnung
 
 ## Eigene Hash-Verknüpfungen mit lokalen Änderungen
 
-In der öffentlichen Version 0.5.0 kann dieselbe Vorlage über mehrere Hashes mit verschiedenen lokalen Einstellungen geöffnet werden. Beispiel: `#Menu-Wohnzimmer` und `#Menu-Flur`. Beide bleiben mit der zentralen Vorlage verbunden; nur gespeicherte Ausnahmen gelten je Verknüpfung.
+In der öffentlichen Version 0.5.1 kann dieselbe Vorlage über mehrere Hashes mit verschiedenen lokalen Einstellungen geöffnet werden. Beispiel: `#Menu-Wohnzimmer` und `#Menu-Flur`. Beide bleiben mit der zentralen Vorlage verbunden; nur gespeicherte Ausnahmen gelten je Verknüpfung.
 
 1. Im Editor einer **Vorlagenkarte** unter **Vorlagen einsetzen** die gespeicherte Vorlage wählen.
 2. Unter **Örtliche Anpassungen** die gewünschten Kartenwerte ändern, etwa Entitäten oder `card_mod`.
@@ -135,7 +135,7 @@ Der alternative Aktionshandler hört auf das von HA verwendete `ll-custom`-Ereig
 
 ## Prüfumfang und Grenzen
 
-Automatisierte Prüfungen umfassen originale Kartentypen, lokale Ausnahmen, Zustandsweitergabe, Hash-Aufrufe und Navigation, Ressourcenfehler und Aufräumen. In der öffentlichen Version 0.5.0 sind außerdem mehrere Hash-Verknüpfungen je Vorlage, separate Entitäten/Styles/Optionen, geerbte Werte, zentrale Aktualisierung, Auswahlwechsel beim Speichern und Löschschutz geprüft. Ein verbundener Ressourcentest verwendet die tatsächliche Hauptressource mit Client und Router; das simulierte Dashboard enthält ausschließlich öffnende Buttons. Ergebnisse und Grenzen: [Funktionstest 0.5.0](docs/TESTS.md).
+Automatisierte Prüfungen umfassen originale Kartentypen, lokale Ausnahmen, Zustandsweitergabe, Hash-Aufrufe und Navigation, Ressourcenfehler und Aufräumen. In der öffentlichen Version 0.5.1 sind außerdem mehrere Hash-Verknüpfungen je Vorlage, separate Entitäten/Styles/Optionen, geerbte Werte, zentrale Aktualisierung, Auswahlwechsel beim Speichern und Löschschutz geprüft. Ein verbundener Ressourcentest verwendet die tatsächliche Hauptressource mit Client und Router; das simulierte Dashboard enthält ausschließlich öffnende Buttons. Ergebnisse und Grenzen: [Funktionstest 0.5.1](docs/TESTS.md).
 
 Beim Wechsel zu einem anderen nativen Bubble-Popup bleibt höchstens eine geschlossene Bibliothekshülle bis zum Schließen des fremden Hashes erhalten. Dadurch setzt ein verspätetes Entfernen nicht die globale Scrollsperre des neuen Popups zurück. Beim nächsten Bibliotheksaufruf oder Verlassen der Seite wird die Hülle entfernt. Root-`card_mod` wird mit dem originalen `hui-card`-Host geladen, sofern dieser verfügbar ist; ohne ihn bleibt der ursprüngliche Kartenfactory-Pfad erhalten.
 

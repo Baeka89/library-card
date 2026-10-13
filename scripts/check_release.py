@@ -7,7 +7,7 @@ import struct
 
 import yaml
 
-VERSION = "0.5.0"
+VERSION = "0.5.1"
 
 
 def check(root: Path, configured: bool = True) -> list[str]:

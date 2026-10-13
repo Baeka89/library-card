@@ -1,9 +1,9 @@
-import {css, el, field, captureDisclosures, mountOriginalEditor, whenOpen, visibleInSections} from './library-ui.js?v=0.5.0';
-import {STANDARD_CARDS, cardConstructor, cachedOriginalEditor, updateOriginalEditor, createRenderedCard} from './library-ha-ui.js?v=0.5.0';
-import {editorOverrides, restoreBindings, updateLocalField, designOverrides, clone, getAt, setAt, resolveTemplate, overlap, bindingValue, newId, validateCard, importLibrary, validatePopupRoutes, popupTemplateInfo, popupTemplateRoute} from './library-core.js?v=0.5.0';
-import {configurationYaml, scanDashboards, usages} from './library-tools.js?v=0.5.0';
-import {installTools} from './library-manager-tools.js?v=0.5.0';
-import {installPopupActions} from './library-popup.js?v=0.5.0';
+import {css, el, field, setSelectOptions, confirmAction, captureDisclosures, mountOriginalEditor, whenOpen, visibleInSections} from './library-ui.js?v=0.5.1';
+import {STANDARD_CARDS, cardConstructor, cachedOriginalEditor, updateOriginalEditor, createRenderedCard} from './library-ha-ui.js?v=0.5.1';
+import {editorOverrides, restoreBindings, updateLocalField, designOverrides, clone, getAt, setAt, resolveTemplate, overlap, bindingValue, newId, validateCard, importLibrary, validatePopupRoutes, popupTemplateInfo, popupTemplateRoute} from './library-core.js?v=0.5.1';
+import {configurationYaml, scanDashboards, usages} from './library-tools.js?v=0.5.1';
+import {installTools} from './library-manager-tools.js?v=0.5.1';
+import {installPopupActions} from './library-popup.js?v=0.5.1';
 const clients = new WeakMap();
 // Inspect only requested templates and their actual dependencies. Snapshot data
 // is authoritative; no draft or persistent browser data enters these caches.
@@ -107,7 +107,7 @@ function client(hass) {
   }
   return state;
 }
-function button(parent, text, action) { const b = el('button', text, parent); b.type = 'button'; b.onclick = action; return b; }
+function button(parent, text, action) { const b = el('button', text, parent); b.type = 'button'; b.onclick = event => { if (!b.disabled) return action(event); }; return b; }
 let popupWatchedState, popupLibraryListener;
 function currentPopupReference(hass, reference) {
   const state = client(hass);
@@ -212,7 +212,7 @@ async function storePopupLink(owner, id, previousHash, link) {
   if (previousHash && (!link || link.hash !== previousHash)) {
     const inventory = await scanDashboards(owner._hass); current();
     if (usages(inventory,id,saved).some(entry => entry.reference?.popup_hash === previousHash)) throw Error('Dieser Hash wird noch von Dashboard-Buttons verwendet. Zuerst deren Aufruf ändern.');
-    if (inventory.failures.length && !window.confirm('Nicht alle Dashboards konnten geprüft werden. Verknüpfung trotzdem ändern?')) throw Error('Änderung abgebrochen.');
+    if (inventory.failures.length && !await confirmAction(owner, 'Nicht alle Dashboards konnten geprüft werden. Verknüpfung trotzdem ändern?')) throw Error('Änderung abgebrochen.');
   }
   current();
   if (draft) { owner.draft = candidate; owner.edit(); return 'Im Entwurf übernommen. Zentrale Änderungen speichern.'; }
@@ -321,8 +321,8 @@ function popupUsage(parent, owner, template, overrides = []) {
 function select(parent, items, value, change, caption) {
   const label = caption || (items[0]?.[0] === 'string' ? 'Datentyp' : (items[0]?.[1] || 'Auswahl').replace(/ auswählen$| wählen$/, ''));
   const s = field(parent, label, 'select');
-  for (const [id, name] of items) { const o = el('option', name, s); o.value = id; }
-  s.value = value || ''; s.onchange = () => change(s.value); return s;
+  setSelectOptions(s, items);
+  s.value = value || ''; s.libraryLastValue = s.value; s.onchange = () => change(s.value); return s;
 }
 function tree(parent, value, update, selectPath, path = []) {
   if (value !== null && typeof value === 'object') {
@@ -336,12 +336,12 @@ function tree(parent, value, update, selectPath, path = []) {
     return;
   }
   const row = el('div', undefined, parent); row.className = 'field';
-  const input = field(row, String(path.at(-1) ?? 'Wert'));
-  input.type = typeof value === 'boolean' ? 'checkbox' : typeof value === 'number' ? 'number' : 'text';
+  const type = typeof value === 'boolean' ? 'checkbox' : typeof value === 'number' ? 'number' : 'text';
+  const input = field(row, String(path.at(-1) ?? 'Wert'), 'input', true, type);
   if (input.type === 'checkbox') input.checked = value; else input.value = value ?? '';
   input.onchange = () => update(path, input.type === 'checkbox' ? input.checked : input.type === 'number' ? Number(input.value) : input.value);
   if (typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value)) {
-    const color = field(row, 'Farbe', 'input'); color.type = 'color'; color.value = value;
+    const color = field(row, 'Farbe', 'input', true, 'color'); color.value = value;
     color.onchange = () => { input.value = color.value; update(path, color.value); };
   }
   if (path.length && selectPath) button(row, 'Auswählen', () => selectPath(path));

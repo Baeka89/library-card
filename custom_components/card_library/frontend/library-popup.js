@@ -1,5 +1,5 @@
-import {clone, validateJson, validatePopupRoutes, validatePopupContent, popupTemplateInfo, popupTemplateRoutes, getAt, resolveTemplate} from './library-core.js?v=0.5.0';
-import {createRenderedCard} from './library-ha-ui.js?v=0.5.0';
+import {clone, validateJson, validatePopupRoutes, validatePopupContent, popupTemplateInfo, popupTemplateRoutes, getAt, resolveTemplate} from './library-core.js?v=0.5.1';
+import {createRenderedCard} from './library-ha-ui.js?v=0.5.1';
 
 export function bubblePopupConfig(action, hash, templateConfig) {
   validateJson(action);

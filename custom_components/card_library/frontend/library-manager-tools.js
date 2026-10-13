@@ -1,6 +1,7 @@
-import {clone, getAt, setAt, resolveTemplate, overlap, bindingValue, exportLibrary, importLibrary, changedTemplates, newId} from './library-core.js?v=0.5.0';
-import {scanDashboards, usages, dependencyReport} from './library-tools.js?v=0.5.0';
-import {createRenderedCard} from './library-ha-ui.js?v=0.5.0';
+import {confirmAction} from './library-ui.js?v=0.5.1';
+import {clone, getAt, setAt, resolveTemplate, overlap, bindingValue, exportLibrary, importLibrary, changedTemplates, newId} from './library-core.js?v=0.5.1';
+import {scanDashboards, usages, dependencyReport} from './library-tools.js?v=0.5.1';
+import {createRenderedCard} from './library-ha-ui.js?v=0.5.1';
 
 export function installTools(Manager, {el, field, button, select, tree, whenOpen}) {
   Object.assign(Manager.prototype, {
@@ -15,7 +16,7 @@ export function installTools(Manager, {el, field, button, select, tree, whenOpen
       if (!removed.length) return;
       this.inventory = await scanDashboards(this._hass);
       if (removed.some(id => usages(this.inventory, id, this.state.library).length)) throw Error('Verwendete Vorlagen würden entfernt. Zuerst die Dashboard-Verwendungen anpassen.');
-      if (this.inventory.failures.length && !window.confirm('Die Dashboard-Prüfung ist unvollständig. Bibliothek trotzdem speichern?')) throw Error('Speichern abgebrochen.');
+      if (this.inventory.failures.length && !await confirmAction(this, 'Die Dashboard-Prüfung ist unvollständig. Bibliothek trotzdem speichern?')) throw Error('Speichern abgebrochen.');
     },
     async scan() {
       if (this.scanning) return;
@@ -26,12 +27,8 @@ export function installTools(Manager, {el, field, button, select, tree, whenOpen
     },
     renderTools(card) {
       const activeMode = ['groups', 'people'].includes(this.mode) ? this.mode : 'templates';
-      const area = field(card, 'Konfigurationsbereich', 'select');
-      for (const [mode, label] of [['templates', 'Kartenvorlagen'], ['groups', 'Gemeinsame Einstellungen'], ['people', 'Personen']]) {
-        const option = el('option', label, area); option.value = mode;
-      }
-      area.value = activeMode;
-      area.onchange = () => { this.mode = area.value; this.selected = null; this.path = null; this.groupPath = null; this.render(); };
+      select(card, [['templates', 'Kartenvorlagen'], ['groups', 'Gemeinsame Einstellungen'], ['people', 'Personen']], activeMode,
+        value => { this.mode = value; this.selected = null; this.path = null; this.groupPath = null; this.render(); }, 'Konfigurationsbereich');
       const actions = el('div', undefined, card); actions.className = 'library-actions';
       const create = el('details', undefined, actions); create.className = 'action-menu'; el('summary', 'Vorlage hinzufügen', create);
       button(create, 'Neue Karte', () => { this.mode = 'create'; this.selected = null; this.render(); });
@@ -57,7 +54,7 @@ export function installTools(Manager, {el, field, button, select, tree, whenOpen
         link.href = url; link.download = 'card-library.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
       });
       const importLabel = el('label', 'Vorlagen importieren: JSON-Datei auswählen', transfer);
-      const file = el('input', undefined, importLabel); file.type = 'file'; file.accept = '.json,application/json'; file.setAttribute('aria-label', 'Bibliothek importieren');
+      const file = el('input', undefined, importLabel); file.type = 'file'; file.hidden = true; button(transfer, 'JSON-Datei auswählen', () => file.click()); file.accept = '.json,application/json'; file.setAttribute('aria-label', 'Bibliothek importieren');
       file.onchange = () => this.run(async () => {
         const selected = file.files[0]; if (!selected) return;
         if (selected.size > 32 * 1024 * 1024) throw Error('Importdatei überschreitet 32 MiB');
@@ -207,9 +204,9 @@ export function installTools(Manager, {el, field, button, select, tree, whenOpen
         this.notice = 'Prüfe Verwendungen vor dem Löschen …'; this.render();
         const inventory = await scanDashboards(this._hass); this.inventory = inventory;
         if (usages(inventory, id, this.state.library).length) { this.notice = 'Vorlage wird in Dashboards verwendet und kann nicht gelöscht werden.'; this.render(); return; }
-        if (inventory.failures.length && !window.confirm('Einige Dashboards oder Ressourcen konnten nicht geprüft werden. Trotzdem löschen?')) { this.notice = 'Löschen abgebrochen.'; this.render(); return; }
+        if (inventory.failures.length && !await confirmAction(this, 'Einige Dashboards oder Ressourcen konnten nicht geprüft werden. Trotzdem löschen?')) { this.notice = 'Löschen abgebrochen.'; this.render(); return; }
       }
-      if (!window.confirm('Eintrag im Entwurf löschen? Die Änderung gilt erst nach dem Speichern.')) return;
+      if (!await confirmAction(this, 'Eintrag im Entwurf löschen? Die Änderung gilt erst nach dem Speichern.')) return;
       delete this.draft[mode][id]; this.selected = null; this.notice = ''; this.edit(); this.render();
     },
     previewPanel(card, candidate = this.draft) {
@@ -268,8 +265,8 @@ export function installTools(Manager, {el, field, button, select, tree, whenOpen
       for (const snapshot of [...(this.history || [])].reverse()) {
         const box = el('details', undefined, card);
         el('summary', `Revision ${snapshot.revision} – archiviert ${new Date(snapshot.saved_at).toLocaleString()}`, box);
-        button(box, 'Als Entwurf ansehen', () => {
-          if (this.dirty && !window.confirm('Ungespeicherten Entwurf durch diese Version ersetzen?')) return;
+        button(box, 'Als Entwurf ansehen', async () => {
+          if (this.dirty && !await confirmAction(this, 'Ungespeicherten Entwurf durch diese Version ersetzen?')) return;
           this.draft = {...clone(snapshot.library), revision: this.state.library.revision}; this.draft.people ||= {};
           this.draftState = this.state;
           this.edit(); this.mode = 'preview'; this.render();
@@ -281,7 +278,7 @@ export function installTools(Manager, {el, field, button, select, tree, whenOpen
           this.assertLibraryConnection(state); this.inventory = inventory;
           const removed = Object.keys(baseline.templates).filter(id => !Object.hasOwn(snapshot.library.templates, id));
           if (removed.some(id => usages(inventory, id, baseline).length)) throw Error('Wiederherstellung würde verwendete Vorlagen entfernen. Zuerst Verwendungen anpassen.');
-          if (!window.confirm('Gesamte Bibliothek wiederherstellen? Ungespeicherte Änderungen gehen verloren.' + (inventory.failures.length ? ' Die Dashboard-Prüfung ist unvollständig.' : ''))) return;
+          if (!await confirmAction(this, 'Gesamte Bibliothek wiederherstellen? Ungespeicherte Änderungen gehen verloren.' + (inventory.failures.length ? ' Die Dashboard-Prüfung ist unvollständig.' : ''))) return;
           const restored = await hass.callWS({type: 'card_library/restore', revision: baseline.revision, target_revision: snapshot.revision});
           this.assertLibraryConnection(state);
           this.draft = clone(this.state.library?.revision > restored.revision ? this.state.library : restored);
@@ -300,8 +297,8 @@ export function installTools(Manager, {el, field, button, select, tree, whenOpen
       if (!this.pendingImport) return;
       el('h3', 'Import prüfen', card);
       el('p', `${Object.keys(this.pendingImport.templates).length} Vorlagen, ${Object.keys(this.pendingImport.groups).length} Einstellungen, ${Object.keys(this.pendingImport.people).length} Personen`, card);
-      button(card, 'Import als Entwurf übernehmen', () => {
-        if (this.dirty && !window.confirm('Ungespeicherten Entwurf durch den Import ersetzen?')) return;
+      button(card, 'Import als Entwurf übernehmen', async () => {
+        if (this.dirty && !await confirmAction(this, 'Ungespeicherten Entwurf durch den Import ersetzen?')) return;
         this.draft = {...clone(this.pendingImport), revision: this.state.library.revision}; this.draftState = this.state;
         this.edit(); this.mode = 'preview'; this.render();
       });

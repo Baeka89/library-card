@@ -45,7 +45,7 @@ class PublicationTest(unittest.TestCase):
         spec=importlib.util.spec_from_file_location('release_builder',ROOT/'scripts/build_release.py');builder=importlib.util.module_from_spec(spec);spec.loader.exec_module(builder)
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);component=root/'custom_components/card_library';component.mkdir(parents=True)
-            manifest=component/'manifest.json';manifest.write_text('{"version":"0.5.0"}');(component/'config.py').write_text('example = 1\n')
+            manifest=component/'manifest.json';manifest.write_text('{"version":"0.5.1"}');(component/'config.py').write_text('example = 1\n')
             first=builder.build(root).read_bytes();os.utime(manifest,(2000000000,2000000000));second=builder.build(root).read_bytes()
             self.assertEqual(first,second)
 
@@ -135,19 +135,19 @@ Link to current release: <>
 Link to successful HACS action: <>
 Link to successful hassfest action: <>
 '''
-        body=publisher.fill_hacs_template(template,{"html_url":"https://github.com/owner/repo/releases/tag/v0.5.0"},{"hacs":{"url":"https://github.com/run/hacs"},"hassfest":{"url":"https://github.com/run/hassfest"}})
+        body=publisher.fill_hacs_template(template,{"html_url":"https://github.com/owner/repo/releases/tag/v0.5.1"},{"hacs":{"url":"https://github.com/run/hacs"},"hassfest":{"url":"https://github.com/run/hassfest"}})
         self.assertEqual(body.count('[x]'),6);self.assertNotIn('[ ]',body);self.assertNotIn('<>',body);self.assertIn('<https://github.com/run/hacs>',body)
 
     def test_release_created_before_checks_cannot_be_submitted(self):
         class Fake:
             def run(self, command, **kwargs):
-                assets=[{"name":"library-card-v0.5.0.zip","state":"uploaded","size":3},{"name":"SHA256SUMS.txt","state":"uploaded","size":3}]
+                assets=[{"name":"library-card-v0.5.1.zip","state":"uploaded","size":3},{"name":"SHA256SUMS.txt","state":"uploaded","size":3}]
                 return result(command,json.dumps({"html_url":"release","published_at":"2026-10-12T10:00:00Z","assets":assets}))
             def api(self, endpoint):
                 if '/git/ref/' in endpoint:return {"object":{"type":"commit","sha":"abc"}}
                 return {"updated_at":"2026-10-12T11:00:00Z"}
         with tempfile.TemporaryDirectory() as directory:
-            root=Path(directory);(root/'dist').mkdir();(root/'dist/library-card-v0.5.0.zip').write_bytes(b'zip');(root/'dist/SHA256SUMS.txt').write_text('sum')
+            root=Path(directory);(root/'dist').mkdir();(root/'dist/library-card-v0.5.1.zip').write_bytes(b'zip');(root/'dist/SHA256SUMS.txt').write_text('sum')
             with self.assertRaisesRegex(publisher.PublicationError,'älter'):
                 publisher.release_repository(Fake(),root,'owner/library-card','abc',{"hacs":{"databaseId":1}})
 

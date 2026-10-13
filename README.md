@@ -34,6 +34,7 @@ Custom Cards müssen separat installiert und als Ressourcen geladen sein. Eine v
 ### Features
 
 * **Zentrale Vorlagen:** fertige Karten speichern, später bearbeiten, duplizieren und löschen. Zentrale Änderungen erreichen alle Verknüpfungen.
+* **Native HA-Oberfläche:** Menüs, Buttons und Felder folgen dem Home-Assistant-Theme; Originaleditoren behalten ihre eigene Oberfläche.
 * **Originale Karteneditoren:** den vorhandenen grafischen Editor der jeweiligen Karte nutzen; alternativ vollständige Karten-YAML direkt einfügen.
 * **Flexible Übernahme:** alles, nur markierte Designfelder oder ausgewählte Felder übernehmen; Entitäten je Verwendung anpassen.
 * **Gemeinsame Einstellungen:** beispielsweise Personenfarben zentral verwalten und mit mehreren Vorlagen verbinden.
@@ -82,6 +83,7 @@ Custom cards must be installed separately and loaded as resources. Compatibility
 ### Features
 
 * **Central templates:** save, edit, duplicate and delete cards. Central changes reach all linked uses.
+* **Native HA interface:** menus, buttons and fields follow the Home Assistant theme; original editors keep their own interface.
 * **Original card editors:** use the card's existing graphical editor or paste complete card YAML directly.
 * **Flexible inheritance:** inherit everything, marked design fields or selected fields; change entities per use.
 * **Shared settings:** centrally manage values such as person colors and link them to multiple templates.
@@ -113,7 +115,7 @@ Der [HACS-Standardantrag](https://github.com/hacs/default/pull/11851) ist einger
 2. **Installieren / Install:** Download **Library Card** in HACS.
 3. **Neustart / Restart:** Restart Home Assistant.
 4. **Einrichten / Setup:** Einstellungen / Settings → Geräte & Dienste / Devices & Services → Integration hinzufügen / Add integration → **Library Card**.
-5. **Ressource / Resource:** Enable advanced mode in your HA profile. Einstellungen / Settings → Dashboards → ⋮ → Ressourcen / Resources: add `/card_library/card-library.js?v=0.5.0` as **JavaScript-Modul / JavaScript module**.
+5. **Ressource / Resource:** Enable advanced mode in your HA profile. Einstellungen / Settings → Dashboards → ⋮ → Ressourcen / Resources: add `/card_library/card-library.js?v=0.5.1` as **JavaScript-Modul / JavaScript module**.
 6. **Browser neu laden / Reload browser:** In the dashboard card picker, choose **Kartenbibliothek** (card library) to manage templates or **Vorlagenkarte** (template card) to insert a linked card.
 
 [![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Baeka89&repository=library-card&category=integration)
@@ -222,7 +224,7 @@ python tests/check_websocket_schemas.py
 
 ### Thanks / Danke
 
-Maintained by **[@Baeka89](https://github.com/Baeka89)**. Thanks to Home Assistant and the authors of the original card editors, [Bubble Card](https://github.com/Clooos/Bubble-Card) and [Family Calendar Card](https://github.com/Baeka89/family-calendar-card), which provided the library menu's design reference.
+Maintained by **[@Baeka89](https://github.com/Baeka89)**. Thanks to Home Assistant and the authors of the original card editors, [Bubble Card](https://github.com/Clooos/Bubble-Card) and [Family Calendar Card](https://github.com/Baeka89/family-calendar-card).
 
 ### License / Lizenz
 

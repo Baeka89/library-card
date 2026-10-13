@@ -1,34 +1,22 @@
-# Prüfungen der öffentlichen Version v0.5.0
+# Prüfungen der Version v0.5.1
 
-Die öffentliche Version enthält den vollständigen bisherigen Funktionsstand,
-einschließlich mehrerer Popup-Hashes mit lokalen Ausnahmen. Die interne
-Versionsfolge wird nicht als frühere öffentliche GitHub-Releases dargestellt.
-
-444 Tests bestehen: 340 JavaScript- und 104 Python-Tests, davon 22 für die Veröffentlichung.
-
-JavaScript prüft Core/Vererbung, Tools, Originaleditoren, Ressourcen und
-Popup-Lebenszyklus. Python prüft Speicherung, History, YAML, Modell und
-Browser-/Backend-Parität. Zusätzliche Publication-Tests prüfen Reihenfolge,
-Fehlerabbruch, Namens-/Pfadsicherheit, Wiederholung, HACS-Sortierung,
-Checklistenänderungen, genaue Commit-Prüfung und übersprungene CI-Jobs.
+612 Tests bestehen: 508 JavaScript- und 104 Python-Tests. Die 163 bisherigen
+UI-Abläufe laufen sowohl mit Browser-Bedienelementen als auch mit nativen
+HA-Testkomponenten. Fünf weitere Tests prüfen die konkreten Komponenten,
+Dropdown-Ereignisse alter/neuer HA-Versionen, verzögertes Laden und Dialoge.
 
 ```bash
 python -m pip install -r requirements-dev.txt
 npm test
 python -m unittest discover -s tests -p 'test_*.py' -v
 python tests/check_websocket_schemas.py
-python scripts/check_release.py
+python scripts/check_release.py --configured
 python scripts/build_release.py
 ```
 
-`--configured` bei `check_release.py` verlangt die tatsächliche GitHub-Identität.
-Diese setzt `publish.py` vor der Veröffentlichung.
+Der Lauf nutzt Testdoubles für HA-Komponenten und Verbindungen. Eine visuelle
+Prüfung in einer laufenden Home-Assistant-Instanz ist in dieser Umgebung nicht
+möglich. Theme, mobile Darstellung und Custom Cards müssen vor Ort geprüft werden.
 
-Echtes Hassfest wurde im offiziellen Container lokal ausgeführt, ohne
-ausgeschaltete Prüfungen. GitHub führt zusätzlich HACS, Hassfest und Tests aus.
-Rohprotokolle und genaue Ergebnisse: [VERIFICATION.txt](VERIFICATION.txt).
-
-UI, Kartenfactories und HA-Verbindungen in den Funktionstests sind Testdoubles.
-Ein neuer automatisierter Live-HA-/Browser-Test wurde nicht durchgeführt.
-Beliebige installierte Custom Cards, CSS, Animationen und Mobil-App-Verhalten
-benötigen Tests vor Ort.
+GitHub führt zusätzlich HACS, Hassfest und Tests für den veröffentlichten Commit
+aus. Der Update-Ablauf veröffentlicht erst nach erfolgreichen Prüfungen.

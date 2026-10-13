@@ -2,20 +2,29 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 
 class Element {
-  constructor(tag = '') { this.tagName = tag; this.children = []; this.listeners = {}; this.isConnected = true; this.value = ''; }
+  constructor(tag = '') { this.tagName = tag; this.children = []; this.listeners = {}; this.isConnected = true; this.value = ''; this.style = {}; }
   attachShadow() { return this.shadowRoot = new Element('shadow'); }
   append(...nodes) { this.children.push(...nodes); }
   replaceChildren(...nodes) { this.children = nodes; }
   setAttribute() {}
   addEventListener(type, fn) { (this.listeners[type] ||= []).push(fn); }
   removeEventListener(type, fn) { this.listeners[type]=(this.listeners[type]||[]).filter(listener=>listener!==fn); }
-  dispatchEvent(event) { this.listeners[event.type]?.forEach(fn => fn(event)); }
+  dispatchEvent(event) { this.listeners[event.type]?.forEach(fn => fn(event)); this['on' + event.type]?.(event); }
   click() { return this.onclick?.({preventDefault(){}, stopPropagation(){}}); }
 }
 const registry = new Map();
 globalThis.HTMLElement = Element;
 globalThis.customElements = {define: (type, klass) => registry.set(type, klass), get: type => registry.get(type)};
 globalThis.document = {createElement: tag => registry.has(tag) ? new (registry.get(tag))() : new Element(tag)};
+if (process.env.LIBRARY_NATIVE_UI === '1') {
+  for (const name of ['ha-button','ha-input','ha-checkbox','ha-textarea','ha-select','ha-expansion-panel','ha-list-item']) {
+    customElements.define(name, class extends Element {
+      constructor() { super(name); if (name === 'ha-select') this.options = undefined; if (['ha-input','ha-textarea'].includes(name)) this.readonly = false; }
+    });
+  }
+}
+function tag(node) { return node?.libraryTag || node?.tagName; }
+function options(node) { return node.libraryOptions?.map(([value,textContent])=>({value,textContent})) || node.children; }
 globalThis.CustomEvent = class { constructor(type, options) { this.type = type; Object.assign(this, options); } };
 class NativeEditor extends Element { setConfig(config) { this.config = config; } }
 class NativeCard extends Element { static async getConfigElement() { return new NativeEditor('native-editor'); } }
@@ -24,8 +33,8 @@ globalThis.window = {customCards:[], location:{href:'https://ha.example/lovelace
   loadCardHelpers:async()=>({createCardElement:config=> { const card = new NativeCard('native-card'); card.config=config; previews.push(config); return card; }})};
 await import('../custom_components/card_library/frontend/card-library.js');
 function nodes(root) { return [root, ...root.children.flatMap(nodes)]; }
-function find(root, text) { const found = nodes(root).find(n=>n.tagName==='button'&&n.textContent===text); assert.ok(found, text); return found; }
-function inputField(root, label) { const box = nodes(root).find(node=>node.children.some(child=>child.tagName==='label'&&child.textContent===label)); assert.ok(box,label);return box.children.find(child=>['input','textarea','select'].includes(child.tagName)); }
+function find(root, text) { const found = nodes(root).find(n=>tag(n)==='button'&&n.textContent===text); assert.ok(found, text); return found; }
+function inputField(root, label) { const box = nodes(root).find(node=>node.children.some(child=>tag(child)==='label'&&child.textContent===label)); assert.ok(box,label);return box.children.find(child=>['input','textarea','select'].includes(tag(child))); }
 const library = () => ({revision:0, templates:{calendar:{name:'Kalender',config:{type:'custom:calendar',layout:'month',color:'#001122'},bindings:[]}},groups:{},people:{anna:{name:'Anna',color:'#aa3344'}}});
 function setup(state = library(), inventoryCards = []) {
   let callback;
@@ -40,7 +49,7 @@ function setup(state = library(), inventoryCards = []) {
   const manager = document.createElement('library-manager'); manager.hass=hass; callback(state);
   return {manager,hass,saved,push:state=>callback(state)};
 }
-function openSection(root, title) { const section=nodes(root).find(n=>n.tagName==='details'&&n.children.some(c=>c.textContent===title));assert.ok(section,title);section.open=true;section.dispatchEvent({type:'toggle'});return section; }
+function openSection(root, title) { const section=nodes(root).find(n=>tag(n)==='details'&&n.children.some(c=>c.textContent===title));assert.ok(section,title);section.open=true;section.dispatchEvent({type:'toggle'});return section; }
 async function settle() { await new Promise(resolve=>setImmediate(resolve)); }
 
 test('native graphical editor changes are saved with people and template configuration', async () => {
@@ -55,8 +64,8 @@ test('native graphical editor changes are saved with people and template configu
 
 test('person binding is created through graphical controls and native editor cannot overwrite it', async () => {
   const {manager} = setup(); manager.selected='calendar'; manager.path=['color']; manager.render(); await settle();
-  const fieldset=nodes(manager.shadowRoot).find(n=>n.tagName==='fieldset'&&n.children.some(c=>c.textContent==='Person zuordnen'));
-  const selects=nodes(fieldset).filter(n=>n.tagName==='select'); selects[0].value='anna'; selects[1].value='color';
+  const fieldset=nodes(manager.shadowRoot).find(n=>tag(n)==='fieldset'&&n.children.some(c=>c.textContent==='Person zuordnen'));
+  const selects=nodes(fieldset).filter(n=>tag(n)==='select'); selects[0].value='anna'; selects[1].value='color';
   find(fieldset,'Personenfeld hier verknüpfen').click(); await settle();
   const binding=manager.draft.templates.calendar.bindings[0];
   assert.deepEqual(binding,{path:['color'],person:'anna',field:'color'});
@@ -90,8 +99,8 @@ test('change comparison renders both saved and draft layouts', async () => {
 test('central color map can add a missing calendar field through the graphical controls', async () => {
   const state=library(); state.groups.colors={name:'Kalenderfarben',value:{'calendar.person_d':'#e2006e'}};
   const {manager}=setup(state); manager.mode='groups'; manager.selected='colors'; manager.render();
-  const box=nodes(manager.shadowRoot).find(n=>n.tagName==='fieldset'&&n.children.some(c=>c.textContent==='Gemeinsames Feld hinzufügen'));
-  const input=nodes(box).find(n=>n.tagName==='input'); input.value='calendar.person_c';
+  const box=nodes(manager.shadowRoot).find(n=>tag(n)==='fieldset'&&n.children.some(c=>c.textContent==='Gemeinsames Feld hinzufügen'));
+  const input=nodes(box).find(n=>tag(n)==='input'); input.value='calendar.person_c';
   find(box,'Gemeinsames Feld anlegen').click();
   assert.equal(manager.draft.groups.colors.value['calendar.person_c'],'');
   assert.equal(manager.dirty,true);
@@ -103,8 +112,8 @@ test('empty template selector gives admins direct access to creation and import'
   find(editor.shadowRoot,'Konfiguration').click();
   assert.ok(editor.manager);
   find(editor.manager.shadowRoot,'Neue Karte');
-  assert.ok(nodes(editor.manager.shadowRoot).some(n=>n.tagName==='input'&&n.type==='file'));
-  assert.ok(nodes(editor.manager.shadowRoot).some(n=>n.tagName==='label'&&n.textContent.startsWith('Vorlagen importieren:')));
+  assert.ok(nodes(editor.manager.shadowRoot).some(n=>tag(n)==='input'&&n.type==='file'));
+  assert.ok(nodes(editor.manager.shadowRoot).some(n=>tag(n)==='label'&&n.textContent.startsWith('Vorlagen importieren:')));
   editor.manager.draft.people.p={name:'Test',color:'#123456'};editor.manager.edit();
   const original=editor.manager;
   editor.render();
@@ -263,7 +272,7 @@ test('resource assignments support manual URLs, installed choices, deduplication
   const {manager}=setup();manager.selected='calendar';manager.inventory={scannedAt:new Date().toISOString(),cards:[],failures:[],resources:[{url:'/installed.js'}]};manager.render();openSection(manager.shadowRoot,'Verwendungen und Abhängigkeiten');
   let input=nodes(manager.shadowRoot).find(n=>n.placeholder==='/hacsfiles/…/karte.js');input.value='/manual.js';find(manager.shadowRoot,'Ressource zuordnen').click();
   input=nodes(manager.shadowRoot).find(n=>n.placeholder==='/hacsfiles/…/karte.js');input.value='/manual.js';find(manager.shadowRoot,'Ressource zuordnen').click();assert.deepEqual(manager.draft.templates.calendar.dependencies,['/manual.js']);
-  const choice=nodes(manager.shadowRoot).find(n=>n.tagName==='select'&&n.children.some(c=>c.textContent==='Installierte Ressource wählen'));choice.value='/installed.js';find(manager.shadowRoot,'Ausgewählte Ressource zuordnen').click();assert.deepEqual(manager.draft.templates.calendar.dependencies,['/manual.js','/installed.js']);
+  const choice=nodes(manager.shadowRoot).find(n=>tag(n)==='select'&&options(n).some(c=>c.textContent==='Installierte Ressource wählen'));choice.value='/installed.js';find(manager.shadowRoot,'Ausgewählte Ressource zuordnen').click();assert.deepEqual(manager.draft.templates.calendar.dependencies,['/manual.js','/installed.js']);
   find(manager.shadowRoot,'Zuordnung entfernen').click();assert.deepEqual(manager.draft.templates.calendar.dependencies,['/installed.js']);
   input=nodes(manager.shadowRoot).find(n=>n.placeholder==='/hacsfiles/…/karte.js');input.value='javascript:bad';find(manager.shadowRoot,'Ressource zuordnen').click();assert.match(manager.notice,/Ressourcen-URL/);
 });
@@ -274,7 +283,7 @@ test('shared setting creation, rebinding and unlinking preserve the currently ef
   nodes(manager.shadowRoot).find(n=>n.placeholder==='Name der gemeinsamen Einstellung').value='New shared color';find(manager.shadowRoot,'Auswahl zentral speichern und verknüpfen').click();
   const replacement=manager.draft.templates.calendar.bindings[0].group;assert.equal(manager.draft.groups[replacement].value,'#abcdef');
   find(manager.shadowRoot,'Verknüpfung lösen').click();assert.deepEqual(manager.draft.templates.calendar.bindings,[]);assert.equal(manager.draft.templates.calendar.config.color,'#abcdef');
-  const choice=nodes(manager.shadowRoot).find(n=>n.tagName==='select'&&n.children.some(c=>c.textContent==='Bestehende Einstellung wählen'));choice.value=original;find(manager.shadowRoot,'Hier verknüpfen').click();assert.equal(manager.draft.templates.calendar.bindings[0].group,original);
+  const choice=nodes(manager.shadowRoot).find(n=>tag(n)==='select'&&options(n).some(c=>c.textContent==='Bestehende Einstellung wählen'));choice.value=original;find(manager.shadowRoot,'Hier verknüpfen').click();assert.equal(manager.draft.templates.calendar.bindings[0].group,original);
 });
 test('local field actions cannot change centrally bound values', () => {
   const state=library();state.templates.calendar.bindings=[{path:['color'],person:'anna',field:'color'}];const {hass}=setup(state);
@@ -357,7 +366,7 @@ test('obsolete design marks can be removed even when the original field no longe
 test('events from a detached card picker cannot add unexpected templates', async () => {
   registry.set('hui-card-picker',Element);
   const {manager}=setup();await manager.newCard(manager.shadowRoot);
-  const chooser=nodes(manager.shadowRoot).find(n=>n.tagName==='fieldset'&&n.children.some(c=>c.textContent==='Karte hinzufügen'));assert.ok(chooser);
+  const chooser=nodes(manager.shadowRoot).find(n=>tag(n)==='fieldset'&&n.children.some(c=>c.textContent==='Karte hinzufügen'));assert.ok(chooser);
   chooser.isConnected=false;const count=Object.keys(manager.draft.templates).length;
   manager.picker.dispatchEvent(new CustomEvent('config-changed',{detail:{config:{type:'markdown',content:'Stale'}},stopPropagation(){}}));assert.equal(Object.keys(manager.draft.templates).length,count);registry.delete('hui-card-picker');
 });
@@ -376,31 +385,31 @@ test('incoming library updates preserve an unsaved native editor and show the re
 });
 test('direct YAML import adds one card and retains existing templates and the full configuration', async () => {
   const {manager,hass}=setup();const previous=hass.callWS;hass.callWS=async msg=>msg.type==='card_library/parse_card'?{type:'custom:energy-flow-card-plus',title:'Energiefluss',entities:{solar:{entity:'sensor.solar'}}}:previous(msg);
-  find(manager.shadowRoot,'Karte aus YAML').click();const text=nodes(manager.shadowRoot).find(n=>n.tagName==='textarea');text.value='type: custom:energy-flow-card-plus\ntitle: Energiefluss';text.oninput();await find(manager.shadowRoot,'YAML als Karte übernehmen').click();
+  find(manager.shadowRoot,'Karte aus YAML').click();const text=nodes(manager.shadowRoot).find(n=>tag(n)==='textarea');text.value='type: custom:energy-flow-card-plus\ntitle: Energiefluss';text.oninput();await find(manager.shadowRoot,'YAML als Karte übernehmen').click();
   assert.equal(Object.keys(manager.draft.templates).length,2);assert.equal(manager.draft.templates[manager.selected].config.entities.solar.entity,'sensor.solar');assert.equal(manager.yamlDraft,'');assert.equal(manager.dirty,true);
 });
 test('invalid YAML keeps the pasted text available for correction', async () => {
-  const {manager,hass}=setup();hass.callWS=async()=>{throw Error('Ungültiges YAML');};find(manager.shadowRoot,'Karte aus YAML').click();const text=nodes(manager.shadowRoot).find(n=>n.tagName==='textarea');text.value='type: [broken';text.oninput();await find(manager.shadowRoot,'YAML als Karte übernehmen').click();
-  assert.equal(manager.mode,'yaml');assert.equal(nodes(manager.shadowRoot).find(n=>n.tagName==='textarea').value,'type: [broken');assert.equal(Object.keys(manager.draft.templates).length,1);assert.match(manager.notice,/Ungültiges YAML/);
+  const {manager,hass}=setup();hass.callWS=async()=>{throw Error('Ungültiges YAML');};find(manager.shadowRoot,'Karte aus YAML').click();const text=nodes(manager.shadowRoot).find(n=>tag(n)==='textarea');text.value='type: [broken';text.oninput();await find(manager.shadowRoot,'YAML als Karte übernehmen').click();
+  assert.equal(manager.mode,'yaml');assert.equal(nodes(manager.shadowRoot).find(n=>tag(n)==='textarea').value,'type: [broken');assert.equal(Object.keys(manager.draft.templates).length,1);assert.match(manager.notice,/Ungültiges YAML/);
 });
 test('navigation groups creation and maintenance actions into closed menus', () => {
-  const {manager}=setup();const menus=nodes(manager.shadowRoot).filter(n=>n.tagName==='details');
+  const {manager}=setup();const menus=nodes(manager.shadowRoot).filter(n=>tag(n)==='details');
   const creation=menus.find(n=>n.children.some(c=>c.textContent==='Vorlage hinzufügen'));const tools=menus.find(n=>n.children.some(c=>c.textContent==='Werkzeuge'));assert.ok(creation);assert.ok(tools);assert.ok(!creation.open&&!tools.open);
   find(creation,'Neue Karte');find(creation,'Karte aus YAML');find(creation,'Dashboards / Übernahme');find(tools,'Bibliothek exportieren');find(tools,'Versionsverlauf');find(tools,'Entwurf verwerfen / neu laden');
-  const area=nodes(manager.shadowRoot).find(n=>n.tagName==='select'&&n.children.some(c=>c.value==='people'));assert.equal(area.children.length,3);assert.equal(area.value,'templates');
-  area.value='people';area.onchange();assert.equal(manager.mode,'people');const updated=nodes(manager.shadowRoot).find(n=>n.tagName==='select'&&n.children.some(c=>c.value==='groups'));updated.value='groups';updated.onchange();assert.equal(manager.mode,'groups');
+  const area=nodes(manager.shadowRoot).find(n=>tag(n)==='select'&&options(n).some(c=>c.value==='people'));assert.equal(options(area).length,3);assert.equal(area.value,'templates');
+  area.value='people';area.onchange();assert.equal(manager.mode,'people');const updated=nodes(manager.shadowRoot).find(n=>tag(n)==='select'&&options(n).some(c=>c.value==='groups'));updated.value='groups';updated.onchange();assert.equal(manager.mode,'groups');
 });
 test('save status updates without rebuilding the native editor and only enables for dirty drafts', async () => {
   const {manager}=setup();manager.selected='calendar';manager.render();await settle();const native=manager.editor;assert.equal(manager.saveButton.disabled,true);assert.equal(manager.statusBadge.textContent,'Alles gespeichert');
   native.dispatchEvent(new CustomEvent('config-changed',{detail:{config:{...native.config,title:'Changed'}},stopPropagation(){}}));assert.equal(manager.saveButton.disabled,false);assert.equal(manager.statusBadge.textContent,'Ungespeicherte Änderungen');assert.equal(manager.editor,native);
 });
 test('advanced controls stay open after selecting a field and template actions are grouped', () => {
-  const {manager}=setup();manager.selected='calendar';manager.path=['color'];manager.render();const advanced=nodes(manager.shadowRoot).find(n=>n.tagName==='details'&&n.children.some(c=>c.textContent==='Vorlagenfelder, Design und Verknüpfungen'));assert.equal(advanced.open,true);
-  const actions=nodes(manager.shadowRoot).find(n=>n.tagName==='details'&&n.children.some(c=>c.textContent==='Vorlagenaktionen'));find(actions,'Löschen');find(actions,'Vorlage duplizieren');assert.ok(!actions.open);
+  const {manager}=setup();manager.selected='calendar';manager.path=['color'];manager.render();const advanced=nodes(manager.shadowRoot).find(n=>tag(n)==='details'&&n.children.some(c=>c.textContent==='Vorlagenfelder, Design und Verknüpfungen'));assert.equal(advanced.open,true);
+  const actions=nodes(manager.shadowRoot).find(n=>tag(n)==='details'&&n.children.some(c=>c.textContent==='Vorlagenaktionen'));find(actions,'Löschen');find(actions,'Vorlage duplizieren');assert.ok(!actions.open);
 });
 test('HA built-in choices are available without loading the native picker or customCards', async () => {
-  const {manager}=setup();await manager.newCard(manager.shadowRoot);const choice=nodes(manager.shadowRoot).find(n=>n.tagName==='select'&&n.children.some(c=>c.textContent==='HA-Karte wählen'));assert.ok(choice);
-  for(const type of ['entities','tile','horizontal-stack','vertical-stack','grid','iframe']) assert.ok(choice.children.some(c=>c.value===type));
+  const {manager}=setup();await manager.newCard(manager.shadowRoot);const choice=nodes(manager.shadowRoot).find(n=>tag(n)==='select'&&options(n).some(c=>c.textContent==='HA-Karte wählen'));assert.ok(choice);
+  for(const type of ['entities','tile','horizontal-stack','vertical-stack','grid','iframe']) assert.ok(options(choice).some(c=>c.value===type));
   class StackCard extends NativeCard {static getStubConfig(){return {cards:[{type:'entities',entities:['calendar.person_a']}]} }}
   registry.set('hui-horizontal-stack-card',StackCard);choice.value='horizontal-stack';
   try {await find(manager.shadowRoot,'HA-Karte hinzufügen').click();assert.equal(manager.draft.templates[manager.selected].config.type,'horizontal-stack');assert.equal(manager.draft.templates[manager.selected].config.cards[0].entities[0],'calendar.person_a');}
@@ -472,7 +481,7 @@ test('footer can be saved even when its original editor cannot load', async () =
   try {
     const id=manager.addTemplate({type:'custom:library-container-card',max_width:1030,card:{type:'horizontal-stack',cards:[]}});await settle();
     assert.ok(id);await manager.save();assert.equal(saved.length,1);assert.equal(saved[0].library.templates[id].config.max_width,1030);
-    const areas=nodes(manager.shadowRoot).filter(n=>n.tagName==='textarea');assert.ok(areas.some(n=>n.value.startsWith('footer:')));
+    const areas=nodes(manager.shadowRoot).filter(n=>tag(n)==='textarea');assert.ok(areas.some(n=>n.value.startsWith('footer:')));
   } finally {window.loadCardHelpers=original;}
 });
 
@@ -511,19 +520,19 @@ test('workflow tabs can be changed using arrow keys', () => {
 });
 
 test('calendar-style sections retain their open state when the manager rerenders', () => {
-  const {manager}=setup();const opened=nodes(manager.shadowRoot).find(n=>n.tagName==='details'&&n.children.some(c=>c.textContent==='Werkzeuge'));
-  opened.open=true;const transfer=nodes(opened).find(n=>n.tagName==='details'&&n.children.some(c=>c.textContent==='Import und Export'));transfer.open=true;
-  manager.render();const restored=nodes(manager.shadowRoot).find(n=>n.tagName==='details'&&n.children.some(c=>c.textContent==='Werkzeuge'));assert.equal(restored.open,true);
-  assert.equal(nodes(restored).find(n=>n.tagName==='details'&&n.children.some(c=>c.textContent==='Import und Export')).open,true);
+  const {manager}=setup();const opened=nodes(manager.shadowRoot).find(n=>tag(n)==='details'&&n.children.some(c=>c.textContent==='Werkzeuge'));
+  opened.open=true;const transfer=nodes(opened).find(n=>tag(n)==='details'&&n.children.some(c=>c.textContent==='Import und Export'));transfer.open=true;
+  manager.render();const restored=nodes(manager.shadowRoot).find(n=>tag(n)==='details'&&n.children.some(c=>c.textContent==='Werkzeuge'));assert.equal(restored.open,true);
+  assert.equal(nodes(restored).find(n=>tag(n)==='details'&&n.children.some(c=>c.textContent==='Import und Export')).open,true);
 });
 test('form controls have associated labels and nested section contents', () => {
   const {manager}=setup();manager.selected='calendar';manager.render();
-  const labels=nodes(manager.shadowRoot).filter(n=>n.tagName==='label');
-  for(const control of nodes(manager.shadowRoot).filter(n=>['select','textarea'].includes(n.tagName))) {
-    assert.ok(labels.some(label=>label.htmlFor===control.id),'Missing label for '+control.tagName);
+  const labels=nodes(manager.shadowRoot).filter(n=>tag(n)==='label');
+  for(const control of nodes(manager.shadowRoot).filter(n=>['select','textarea'].includes(tag(n)))) {
+    assert.ok(labels.some(label=>label.htmlFor===control.id),'Missing label for '+tag(control));
   }
-  const section=nodes(manager.shadowRoot).find(n=>n.tagName==='details'&&n.children.some(c=>c.textContent==='Im Dashboard einbauen'));
-  assert.equal(section.children[0].tagName,'summary');assert.equal(section.children[1].className,'section-content');
+  const section=nodes(manager.shadowRoot).find(n=>tag(n)==='details'&&n.children.some(c=>c.textContent==='Im Dashboard einbauen'));
+  assert.equal(tag(section.children[0]),'summary');assert.equal(section.children[1].className,'section-content');
 });
 test('native editor is isolated from library styles without losing its config events', async () => {
   const {manager}=setup();manager.selected='calendar';manager.render();await settle();
@@ -533,8 +542,8 @@ test('native editor is isolated from library styles without losing its config ev
 });
 test('field selection reopens advanced controls while preserving other disclosures', () => {
   const {manager}=setup();manager.selected='calendar';manager.render();
-  const advanced=nodes(manager.shadowRoot).find(n=>n.tagName==='details'&&n.children.some(c=>c.textContent==='Vorlagenfelder, Design und Verknüpfungen'));advanced.open=false;
-  manager.path=['color'];manager.render();assert.equal(nodes(manager.shadowRoot).find(n=>n.tagName==='details'&&n.children.some(c=>c.textContent==='Vorlagenfelder, Design und Verknüpfungen')).open,true);
+  const advanced=nodes(manager.shadowRoot).find(n=>tag(n)==='details'&&n.children.some(c=>c.textContent==='Vorlagenfelder, Design und Verknüpfungen'));advanced.open=false;
+  manager.path=['color'];manager.render();assert.equal(nodes(manager.shadowRoot).find(n=>tag(n)==='details'&&n.children.some(c=>c.textContent==='Vorlagenfelder, Design und Verknüpfungen')).open,true);
 });
 
 test('closed preview and local-editor sections do not instantiate expensive cards', async () => {
@@ -621,14 +630,14 @@ test('native update emitting rebuild cannot overwrite the replacement render', a
 test('local style UI adds multiline card-mod without changing central template and can relink', async () => {
   const {hass,push}=setup();const editor=document.createElement('library-card-editor');editor.setConfig({template:'calendar'});editor.hass=hass;
   openSection(editor.shadowRoot,'Örtliche Anpassungen');await settle();const section=openSection(editor.shadowRoot,'Zusätzliche lokale Styles');
-  const css=nodes(section).find(n=>n.tagName==='textarea');css.value='ha-card {\n  background: transparent !important;\n  border: none !important;\n}\n';find(section,'Style lokal übernehmen').click();
+  const css=nodes(section).find(n=>tag(n)==='textarea');css.value='ha-card {\n  background: transparent !important;\n  border: none !important;\n}\n';find(section,'Style lokal übernehmen').click();
   assert.deepEqual(editor.config.overrides,[{path:['card_mod','style'],value:css.value}]);assert.equal(editor.state.library.templates.calendar.config.card_mod,undefined);assert.equal(editor.editor.config.card_mod.style,css.value);
   const changed=library();changed.templates.calendar.config.layout='week';push(changed);await settle();assert.equal(editor.config.overrides[0].value,css.value);
   const refreshed=openSection(editor.shadowRoot,'Zusätzliche lokale Styles');find(refreshed,'Style wieder aus Vorlage übernehmen').click();assert.deepEqual(editor.config.overrides,[]);
 });
 test('local style UI supports style_ha_card and nested stack paths while protecting bindings', () => {
   const state=library();state.templates.calendar.config={type:'horizontal-stack',cards:[{type:'custom:calendar',color:'#aa3344'}]};state.templates.calendar.bindings=[{path:['cards',0,'color'],person:'anna',field:'color'}];const {hass}=setup(state);
-  const editor=document.createElement('library-card-editor');editor.setConfig({template:'calendar'});editor.hass=hass;const section=openSection(editor.shadowRoot,'Zusätzliche lokale Styles');const inputs=nodes(section).filter(n=>n.tagName==='input');const css=nodes(section).find(n=>n.tagName==='textarea');
+  const editor=document.createElement('library-card-editor');editor.setConfig({template:'calendar'});editor.hass=hass;const section=openSection(editor.shadowRoot,'Zusätzliche lokale Styles');const inputs=nodes(section).filter(n=>tag(n)==='input');const css=nodes(section).find(n=>tag(n)==='textarea');
   find(section,'style_ha_card').click();css.value='background: transparent !important;\nborder: none !important;';find(section,'Style lokal übernehmen').click();assert.equal(editor.config.overrides[0].path[0],'style_ha_card');
   inputs[0].value='cards.0.card_mod.style';css.value='ha-card { box-shadow: none; }';find(section,'Style lokal übernehmen').click();assert.deepEqual(editor.config.overrides[1].path,['cards',0,'card_mod','style']);
   inputs[0].value='cards.0.color';find(section,'Style lokal übernehmen').click();assert.equal(editor.config.overrides.length,2);assert.ok(nodes(section).some(n=>String(n.textContent).includes('zentral verwaltet')));
@@ -638,7 +647,7 @@ test('complete local YAML accepts arbitrary design objects lists actions and fie
   const state=library();state.templates.calendar.config.entities=['sensor.original'];const {hass}=setup(state);
   const edited={type:'custom:calendar',layout:'month',entities:['sensor.local'],card_mod:{style:{'.': 'ha-card {background: transparent}', 'hui-card $': {'.':'div {color: red}'}}},styles:{card:[{'border-radius':'12px'},{opacity:0.9}]},tap_action:{action:'navigate',navigation_path:'/local'}};
   hass.callWS=async msg=>{assert.equal(msg.type,'card_library/parse_card');assert.ok(msg.yaml.includes('card_mod:'));return edited;};
-  const editor=document.createElement('library-card-editor');editor.setConfig({template:'calendar'});editor.hass=hass;const section=openSection(editor.shadowRoot,'Vollständige lokale Konfiguration (YAML)');const source=nodes(section).find(n=>n.tagName==='textarea');source.value='type: custom:calendar\ncard_mod:\n  style: {}';await find(section,'YAML lokal übernehmen').click();
+  const editor=document.createElement('library-card-editor');editor.setConfig({template:'calendar'});editor.hass=hass;const section=openSection(editor.shadowRoot,'Vollständige lokale Konfiguration (YAML)');const source=nodes(section).find(n=>tag(n)==='textarea');source.value='type: custom:calendar\ncard_mod:\n  style: {}';await find(section,'YAML lokal übernehmen').click();
   const {resolveTemplate}=await import('../custom_components/card_library/frontend/library-core.js');assert.deepEqual(resolveTemplate(editor.state.library,'calendar',editor.config.overrides),edited);assert.equal(state.templates.calendar.config.card_mod,undefined);assert.ok(editor.config.overrides.some(o=>o.path[0]==='color'&&o.remove));
 });
 test('complete local YAML preserves protected bindings and rejects root card type changes', async () => {
@@ -698,7 +707,7 @@ test('footer original editor receives changing Lovelace context', async () => {
   const {originalEditor}=await import('../custom_components/card_library/frontend/library-ha-ui.js');const {hass}=setup();const editor=await originalEditor(hass,{type:'custom:library-container-card',card:{type:'custom:calendar'}},{views:[]});const native=editor.children[0],context={views:[{title:'New context'}]};editor.lovelace=context;assert.equal(native.lovelace,context);
 });
 test('local style remains emitted when a third-party editor update throws', async () => {
-  const {hass}=setup();const editor=document.createElement('library-card-editor');editor.setConfig({template:'calendar'});editor.hass=hass;openSection(editor.shadowRoot,'Örtliche Anpassungen');await settle();const original=editor.editor;original.setConfig=()=>{throw Error('Editor update failed');};let emitted;editor.addEventListener('config-changed',event=>{emitted=event.detail.config;});const section=openSection(editor.shadowRoot,'Zusätzliche lokale Styles');nodes(section).find(n=>n.tagName==='textarea').value='ha-card {border: none;}';find(section,'Style lokal übernehmen').click();assert.equal(emitted.overrides[0].value,'ha-card {border: none;}');assert.equal(original.listeners['config-changed'].length,0);await settle();assert.equal(editor.config.overrides[0].value,'ha-card {border: none;}');
+  const {hass}=setup();const editor=document.createElement('library-card-editor');editor.setConfig({template:'calendar'});editor.hass=hass;openSection(editor.shadowRoot,'Örtliche Anpassungen');await settle();const original=editor.editor;original.setConfig=()=>{throw Error('Editor update failed');};let emitted;editor.addEventListener('config-changed',event=>{emitted=event.detail.config;});const section=openSection(editor.shadowRoot,'Zusätzliche lokale Styles');nodes(section).find(n=>tag(n)==='textarea').value='ha-card {border: none;}';find(section,'Style lokal übernehmen').click();assert.equal(emitted.overrides[0].value,'ha-card {border: none;}');assert.equal(original.listeners['config-changed'].length,0);await settle();assert.equal(editor.config.overrides[0].value,'ha-card {border: none;}');
 });
 test('removed native child upgrade does not receive the current hass object', async () => {
   const {hass}=setup();const card=document.createElement('library-card');card.setConfig({template:'calendar'});card.hass=hass;await settle();const old=card.child;card.setConfig({template:'calendar',overrides:[{path:['layout'],value:'week'}]});await settle();const stale=old.hass;card.hass={...hass,states:{'sensor.new':{state:'on'}}};old.dispatchEvent({type:'ll-upgrade',target:old,stopPropagation(){}});assert.equal(old.hass,stale);
@@ -736,25 +745,25 @@ test('equivalent reference changes do not force a later unrelated central card r
 });
 
 test('local style UI can modify a middle card in an expanded local stack', async () => {
-  const state=library();state.templates.calendar.config={type:'horizontal-stack',cards:[{type:'markdown',content:'Central'}]};const {hass}=setup(state);const cards=[{type:'markdown',content:'A'},{type:'markdown',content:'B'},{type:'markdown',content:'C'}];const editor=document.createElement('library-card-editor');editor.setConfig({template:'calendar',overrides:[{path:['cards'],value:cards}]});editor.hass=hass;const section=openSection(editor.shadowRoot,'Zusätzliche lokale Styles');nodes(section).find(n=>n.tagName==='input').value='cards.1.card_mod.style';nodes(section).find(n=>n.tagName==='textarea').value='ha-card {background: transparent;}';find(section,'Style lokal übernehmen').click();
+  const state=library();state.templates.calendar.config={type:'horizontal-stack',cards:[{type:'markdown',content:'Central'}]};const {hass}=setup(state);const cards=[{type:'markdown',content:'A'},{type:'markdown',content:'B'},{type:'markdown',content:'C'}];const editor=document.createElement('library-card-editor');editor.setConfig({template:'calendar',overrides:[{path:['cards'],value:cards}]});editor.hass=hass;const section=openSection(editor.shadowRoot,'Zusätzliche lokale Styles');nodes(section).find(n=>tag(n)==='input').value='cards.1.card_mod.style';nodes(section).find(n=>tag(n)==='textarea').value='ha-card {background: transparent;}';find(section,'Style lokal übernehmen').click();
   const {resolveTemplate}=await import('../custom_components/card_library/frontend/library-core.js');const resolved=resolveTemplate(editor.state.library,'calendar',editor.config.overrides);assert.equal(resolved.cards.length,3);assert.equal(resolved.cards[1].content,'B');assert.equal(resolved.cards[1].card_mod.style,'ha-card {background: transparent;}');assert.equal(resolved.cards[2].content,'C');assert.equal(cards[1].card_mod,undefined);
 });
 
 test('unapplied local YAML text survives library rerenders and still detects stale configuration', async () => {
-  const {hass,push}=setup();const editor=document.createElement('library-card-editor');editor.setConfig({template:'calendar'});editor.hass=hass;const section=openSection(editor.shadowRoot,'Vollständige lokale Konfiguration (YAML)');const source=nodes(section).find(n=>n.tagName==='textarea');source.value='type: custom:calendar\nlayout: agenda';source.oninput?.();
-  const changed=library();changed.templates.calendar.config.color='#ffffff';push(changed);const refreshed=openSection(editor.shadowRoot,'Vollständige lokale Konfiguration (YAML)');assert.equal(nodes(refreshed).find(n=>n.tagName==='textarea').value,source.value);await find(refreshed,'YAML lokal übernehmen').click();assert.ok(nodes(refreshed).some(n=>String(n.textContent).includes('inzwischen geändert')));assert.equal(editor.config.overrides,undefined);
+  const {hass,push}=setup();const editor=document.createElement('library-card-editor');editor.setConfig({template:'calendar'});editor.hass=hass;const section=openSection(editor.shadowRoot,'Vollständige lokale Konfiguration (YAML)');const source=nodes(section).find(n=>tag(n)==='textarea');source.value='type: custom:calendar\nlayout: agenda';source.oninput?.();
+  const changed=library();changed.templates.calendar.config.color='#ffffff';push(changed);const refreshed=openSection(editor.shadowRoot,'Vollständige lokale Konfiguration (YAML)');assert.equal(nodes(refreshed).find(n=>tag(n)==='textarea').value,source.value);await find(refreshed,'YAML lokal übernehmen').click();assert.ok(nodes(refreshed).some(n=>String(n.textContent).includes('inzwischen geändert')));assert.equal(editor.config.overrides,undefined);
 });
 test('unapplied local CSS and target survive library rerenders', () => {
-  const {hass,push}=setup();const editor=document.createElement('library-card-editor');editor.setConfig({template:'calendar'});editor.hass=hass;const section=openSection(editor.shadowRoot,'Zusätzliche lokale Styles');find(section,'style_ha_card').click();const source=nodes(section).find(n=>n.tagName==='textarea');source.value='background: transparent !important;';source.oninput?.();push(library());const refreshed=openSection(editor.shadowRoot,'Zusätzliche lokale Styles');assert.equal(nodes(refreshed).find(n=>n.tagName==='textarea').value,source.value);assert.equal(nodes(refreshed).find(n=>n.tagName==='input').value,'style_ha_card');
+  const {hass,push}=setup();const editor=document.createElement('library-card-editor');editor.setConfig({template:'calendar'});editor.hass=hass;const section=openSection(editor.shadowRoot,'Zusätzliche lokale Styles');find(section,'style_ha_card').click();const source=nodes(section).find(n=>tag(n)==='textarea');source.value='background: transparent !important;';source.oninput?.();push(library());const refreshed=openSection(editor.shadowRoot,'Zusätzliche lokale Styles');assert.equal(nodes(refreshed).find(n=>tag(n)==='textarea').value,source.value);assert.equal(nodes(refreshed).find(n=>tag(n)==='input').value,'style_ha_card');
 });
 
 test('explicit reset clears unapplied YAML and CSS drafts', () => {
-  const {hass}=setup();const editor=document.createElement('library-card-editor');editor.setConfig({template:'calendar'});editor.hass=hass;const yaml=openSection(editor.shadowRoot,'Vollständige lokale Konfiguration (YAML)'),source=nodes(yaml).find(n=>n.tagName==='textarea');source.value='type: custom:calendar\ntitle: Draft';source.oninput();const style=openSection(editor.shadowRoot,'Zusätzliche lokale Styles'),css=nodes(style).find(n=>n.tagName==='textarea');css.value='ha-card {color: red;}';css.oninput();find(editor.shadowRoot,'Lokale Anpassungen zurücksetzen').click();assert.equal(editor.localYamlDraft,null);assert.equal(editor.localStyleDraft,null);
+  const {hass}=setup();const editor=document.createElement('library-card-editor');editor.setConfig({template:'calendar'});editor.hass=hass;const yaml=openSection(editor.shadowRoot,'Vollständige lokale Konfiguration (YAML)'),source=nodes(yaml).find(n=>tag(n)==='textarea');source.value='type: custom:calendar\ntitle: Draft';source.oninput();const style=openSection(editor.shadowRoot,'Zusätzliche lokale Styles'),css=nodes(style).find(n=>tag(n)==='textarea');css.value='ha-card {color: red;}';css.oninput();find(editor.shadowRoot,'Lokale Anpassungen zurücksetzen').click();assert.equal(editor.localYamlDraft,null);assert.equal(editor.localStyleDraft,null);
 });
 
 test('external template changes discard old local paths and drafts and choose the footer style target', () => {
   const state=library();state.templates.footer={name:'Footer',config:{type:'custom:library-container-card',card:{type:'markdown',content:'Footer'}},bindings:[]};const {hass}=setup(state);const editor=document.createElement('library-card-editor');editor.setConfig({template:'calendar'});editor.hass=hass;editor.localPath=['old'];editor.stylePath='cards.1.card_mod.style';editor.localStyleDraft={template:'calendar',path:editor.stylePath,text:'Old CSS'};editor.localYamlDraft={template:'calendar',text:'Old YAML',baseline:'old'};
-  editor.setConfig({template:'footer'});assert.equal(editor.localPath,null);assert.equal(editor.localStyleDraft,null);assert.equal(editor.localYamlDraft,null);const styles=openSection(editor.shadowRoot,'Zusätzliche lokale Styles');assert.equal(nodes(styles).find(n=>n.tagName==='input').value,'card.card_mod.style');
+  editor.setConfig({template:'footer'});assert.equal(editor.localPath,null);assert.equal(editor.localStyleDraft,null);assert.equal(editor.localYamlDraft,null);const styles=openSection(editor.shadowRoot,'Zusätzliche lokale Styles');assert.equal(nodes(styles).find(n=>tag(n)==='input').value,'card.card_mod.style');
 });
 
 test('a failing library editor cannot interrupt central updates to other dashboard references', async () => {
@@ -809,11 +818,11 @@ test('insertion shows the saved native popup hash and normal button separately f
   editor.setConfig({template:'calendar',overrides:[{path:['hash'],value:'#local-draft'},{path:['cards',0,'content'],value:'Local'}]});
   editor.hass = hass;
   const section = openSection(editor.shadowRoot,'Als Bubble-Popup verwenden');
-  const central = nodes(section).find(node=>node.tagName==='fieldset'&&node.children.some(child=>child.textContent==='Zentralen Popup-Hash verwenden'));
+  const central = nodes(section).find(node=>tag(node)==='fieldset'&&node.children.some(child=>child.textContent==='Zentralen Popup-Hash verwenden'));
   assert.ok(central);
-  const hash = nodes(central).find(node=>node.tagName==='input');
+  const hash = nodes(central).find(node=>tag(node)==='input');
   assert.equal(hash.value,'#Menu'); assert.equal(hash.readOnly,true);
-  const output = nodes(central).find(node=>node.tagName==='textarea');
+  const output = nodes(central).find(node=>tag(node)==='textarea');
   assert.match(output.value,/navigate/); assert.match(output.value,/#Menu/);
   assert.doesNotMatch(output.value,/fire-dom-event|local-draft|Local|overrides/);
   assert.ok(nodes(central).some(node=>String(node.textContent||'').includes('Örtliche Anpassungen')));
@@ -826,12 +835,12 @@ test('insertion uses the effective metadata hash and follows central route chang
   const {hass,push} = setup(state);
   const editor = document.createElement('library-card-editor'); editor.setConfig({template:'calendar'}); editor.hass = hass;
   let section = openSection(editor.shadowRoot,'Als Bubble-Popup verwenden');
-  let central = nodes(section).find(node=>node.tagName==='fieldset'&&node.children.some(child=>child.textContent==='Zentralen Popup-Hash verwenden'));
-  assert.ok(central); assert.match(nodes(central).find(node=>node.tagName==='textarea').value,/#assigned/);
+  let central = nodes(section).find(node=>tag(node)==='fieldset'&&node.children.some(child=>child.textContent==='Zentralen Popup-Hash verwenden'));
+  assert.ok(central); assert.match(nodes(central).find(node=>tag(node)==='textarea').value,/#assigned/);
   const next=structuredClone(state);next.revision++;delete next.templates.calendar.popup;next.templates.calendar.config.hash='#new-native';push(next);
   section=openSection(editor.shadowRoot,'Als Bubble-Popup verwenden');
-  central=nodes(section).find(node=>node.tagName==='fieldset'&&node.children.some(child=>child.textContent==='Zentralen Popup-Hash verwenden'));
-  const output=nodes(central).find(node=>node.tagName==='textarea');assert.match(output.value,/#new-native/);assert.doesNotMatch(output.value,/#assigned/);
+  central=nodes(section).find(node=>tag(node)==='fieldset'&&node.children.some(child=>child.textContent==='Zentralen Popup-Hash verwenden'));
+  const output=nodes(central).find(node=>tag(node)==='textarea');assert.match(output.value,/#new-native/);assert.doesNotMatch(output.value,/#assigned/);
 });
 
 test('popup button output refreshes after native local edits without rebuilding that editor', async () => {
@@ -842,7 +851,7 @@ test('popup button output refreshes after native local edits without rebuilding 
   const native=editor.editor;assert.ok(native);
   native.dispatchEvent(new CustomEvent('config-changed',{detail:{config:{...native.config,layout:'agenda'}},stopPropagation(){}}));
   assert.equal(editor.editor,native);
-  const output=nodes(section).find(node=>node.tagName==='textarea'&&String(node.value).includes('fire-dom-event'));
+  const output=nodes(section).find(node=>tag(node)==='textarea'&&String(node.value).includes('fire-dom-event'));
   assert.ok(output);assert.match(output.value,/agenda/);
 });
 
@@ -995,21 +1004,21 @@ test('a manager selection change during alias checks keeps the current native ed
 test('central popup hash UI stores and removes the route with the template', async () => {
   const {manager,saved} = setup(); manager.selected = 'calendar'; manager.render();
   const section = openSection(manager.shadowRoot, 'Popup über #Hash öffnen');
-  const inputs = nodes(section).filter(n => n.tagName === 'input');
+  const inputs = nodes(section).filter(n => tag(n) === 'input');
   inputs[0].value = '#kalender'; inputs[0].onchange();
   inputs[1].value = 'Familie'; inputs[1].onchange();
   inputs[2].value = '900px'; inputs[2].onchange();
   await manager.save();
   assert.deepEqual(saved[0].library.templates.calendar.popup, {hash:'#kalender', options:{name:'Familie',width_desktop:'900px'}});
   const next = openSection(manager.shadowRoot, 'Popup über #Hash öffnen');
-  const hash = nodes(next).find(n => n.tagName === 'input'); hash.value = ''; hash.onchange();
+  const hash = nodes(next).find(n => tag(n) === 'input'); hash.value = ''; hash.onchange();
   await manager.save(); assert.equal(saved[1].library.templates.calendar.popup, undefined);
 });
 test('central popup hash UI rejects an existing hash without overwriting a route', () => {
   const lib = library(); lib.templates.other = {name:'Andere',config:{type:'markdown',content:'x'},popup:{hash:'#kalender'}};
   const {manager} = setup(lib); manager.selected = 'calendar'; manager.render();
   const section = openSection(manager.shadowRoot, 'Popup über #Hash öffnen');
-  const hash = nodes(section).find(n => n.tagName === 'input'); hash.value = '#kalender'; hash.onchange();
+  const hash = nodes(section).find(n => tag(n) === 'input'); hash.value = '#kalender'; hash.onchange();
   assert.equal(manager.draft.templates.calendar.popup, undefined);
   assert.ok(nodes(section).some(n => String(n.textContent || '').includes('bereits')));
 });
@@ -1028,7 +1037,7 @@ test('native popup management provides only a hash button and retains the origin
   assert.equal(manager.editor.config.type,'custom:bubble-card');
   assert.equal(manager.editor.config.card_type,'pop-up');
   const section = openSection(manager.shadowRoot,'Popup über #Hash öffnen');
-  const output = nodes(section).find(node=>node.tagName==='textarea');
+  const output = nodes(section).find(node=>tag(node)==='textarea');
   assert.match(output.value, /navigate/); assert.match(output.value, /#native/);
   assert.doesNotMatch(output.value,/custom:library-card|fire-dom-event/);
   assert.ok(!nodes(manager.shadowRoot).some(node=>node.textContent==='Dashboard-Referenz'));
@@ -1078,8 +1087,8 @@ test('editing an old popup option after deleting its route cannot recreate or cr
   const {manager} = setup(lib); manager.selected = 'calendar'; manager.render();
   const section = openSection(manager.shadowRoot, 'Popup über #Hash öffnen');
   const extra = openSection(section, 'Weitere originale Bubble-Einstellungen');
-  const style = nodes(extra).find(n => n.tagName === 'input' && n.value === 'old-style');
-  const hash = nodes(section).find(n => n.tagName === 'input'); hash.value = ''; hash.onchange();
+  const style = nodes(extra).find(n => tag(n) === 'input' && n.value === 'old-style');
+  const hash = nodes(section).find(n => tag(n) === 'input'); hash.value = ''; hash.onchange();
   style.value = 'new-style'; assert.doesNotThrow(() => style.onchange());
   assert.equal(manager.draft.templates.calendar.popup, undefined);
 });
@@ -1304,15 +1313,15 @@ test('card-mod uses original HA hosts for references footer children and library
     const {manager,hass,push} = setup(state);
     const wrapper = document.createElement('library-card');wrapper.setConfig({template:'calendar'});wrapper.hass = hass;await settle();
     const host = wrapper.child, native = host.native;
-    assert.equal(host.tagName, 'hui-card');assert.deepEqual(native.appliedCardMod, state.templates.calendar.config.card_mod);
+    assert.equal(tag(host), 'hui-card');assert.deepEqual(native.appliedCardMod, state.templates.calendar.config.card_mod);
     assert.equal(wrapper.getCardSize(), 0);assert.deepEqual(wrapper.getGridOptions(), {columns:6,rows:2});
     const changed = structuredClone(state);changed.templates.calendar.config.layout = 'agenda';push(changed);await settle();
     assert.equal(wrapper.child, host);assert.equal(host.native, native);assert.equal(native.config.layout, 'agenda');
     const latestHass = {...hass,states:{changed:{state:'on'}}};wrapper.hass = latestHass;assert.equal(native.hass, latestHass);
     const footer = document.createElement('library-container-card');footer.setConfig({type:'custom:library-container-card',card:state.templates.calendar.config});footer.hass = hass;await settle();
-    assert.equal(footer.child.tagName, 'hui-card');assert.equal(footer.getCardSize(), 0);
+    assert.equal(tag(footer.child), 'hui-card');assert.equal(footer.getCardSize(), 0);
     const preview = new Element('div');await manager.previewCard(preview, state, 'calendar');
-    assert.equal(preview.previewChild.tagName, 'hui-card');assert.equal(loads, 3);
+    assert.equal(tag(preview.previewChild), 'hui-card');assert.equal(loads, 3);
   } finally {registry.delete('hui-card');}
 });
 

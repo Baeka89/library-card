@@ -1,4 +1,4 @@
-import {walkCards, dependencies, popupTemplateRoutes} from './library-core.js?v=0.5.0';
+import {walkCards, dependencies, popupTemplateRoutes} from './library-core.js?v=0.5.1';
 export async function scanDashboards(hass) {
   const result = {cards: [], failures: [], resources: [], scanned: [], resourcesAvailable: false, scannedAt: new Date().toISOString()};
   let dashboards = [];

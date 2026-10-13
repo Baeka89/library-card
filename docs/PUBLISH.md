@@ -1,4 +1,4 @@
-# v0.5.0 veröffentlichen und bei HACS einreichen
+# v0.5.1 veröffentlichen und bei HACS einreichen
 
 Das vollständige Quellpaket entpacken. `publish.py` benötigt die anderen
 Projektdateien und ist kein eigenständiger Installer ohne Quellcode.
@@ -53,7 +53,7 @@ Der Ablauf:
    Topics und Issues einrichten. Den lokalen `main`-Branch ohne Force-Push hochladen.
 5. **HACS**, **Hassfest** und **Tests** für genau diesen Commit abwarten.
    Fehler, übersprungene Jobs oder ein Zeitlimit stoppen den Ablauf.
-6. Den Tag `v0.5.0` und ein vollständiges stabiles GitHub-Release erstellen.
+6. Den Tag `v0.5.1` und ein vollständiges stabiles GitHub-Release erstellen.
    Integrations-ZIP und SHA256-Prüfsumme werden beigefügt und geprüft.
 7. `hacs/default` in dein persönliches Konto forken. Einen eigenen Branch von
    `upstream/master` erstellen und nur deinen alphabetischen Eintrag in `integration` ergänzen.
