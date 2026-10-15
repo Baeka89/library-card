@@ -1,9 +1,10 @@
-import {css, el, field, setSelectOptions, confirmAction, captureDisclosures, mountOriginalEditor, whenOpen, visibleInSections} from './library-ui.js?v=0.5.1';
-import {STANDARD_CARDS, cardConstructor, cachedOriginalEditor, updateOriginalEditor, createRenderedCard} from './library-ha-ui.js?v=0.5.1';
-import {editorOverrides, restoreBindings, updateLocalField, designOverrides, clone, getAt, setAt, resolveTemplate, overlap, bindingValue, newId, validateCard, importLibrary, validatePopupRoutes, popupTemplateInfo, popupTemplateRoute} from './library-core.js?v=0.5.1';
-import {configurationYaml, scanDashboards, usages} from './library-tools.js?v=0.5.1';
-import {installTools} from './library-manager-tools.js?v=0.5.1';
-import {installPopupActions} from './library-popup.js?v=0.5.1';
+import {css, el, field, setSelectOptions, confirmAction, captureDisclosures, mountOriginalEditor, whenOpen, visibleInSections} from './library-ui.js?v=0.5.2';
+import {STANDARD_CARDS, cardConstructor, cachedOriginalEditor, updateOriginalEditor, createRenderedCard} from './library-ha-ui.js?v=0.5.2';
+import {editorOverrides, restoreBindings, updateLocalField, designOverrides, clone, getAt, setAt, resolveTemplate, overlap, bindingValue, newId, validateCard, importLibrary, validatePopupRoutes, popupTemplateInfo, popupTemplateRoute, inputErrors} from './library-core.js?v=0.5.2';
+import {configurationYaml, scanDashboards, usages} from './library-tools.js?v=0.5.2';
+import {installTools} from './library-manager-tools.js?v=0.5.2';
+import {installWorkflows} from './library-workflows.js?v=0.5.2';
+import {installPopupActions} from './library-popup.js?v=0.5.2';
 const clients = new WeakMap();
 // Inspect only requested templates and their actual dependencies. Snapshot data
 // is authoritative; no draft or persistent browser data enters these caches.
@@ -113,7 +114,9 @@ function currentPopupReference(hass, reference) {
   const state = client(hass);
   if (state.error) throw state.error;
   if (!state.library) throw Error('Die Vorlagenbibliothek ist noch nicht verfügbar.');
-  return resolvedCard(state, reference).config;
+  const config = resolvedCard(state, reference).config, errors = inputErrors(state.library.templates[reference.template],config);
+  if (errors.length) throw Error(errors.join(' · '));
+  return config;
 }
 const popupController = installPopupActions(async (hass, reference) => {
   const state = client(hass);
@@ -351,13 +354,16 @@ class Base extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     if (this._connection !== hass.connection) {
+      this.inventory = null;
       this.unwatch(); this._connection = hass.connection; this.state = client(hass);
-      this._listener = () => this.refreshLibrary(); this.state.listeners.add(this._listener);
-      this.refreshLibrary();
+      this._listener = () => this.refreshLibrary();
+      if (!this._detached) { this.state.listeners.add(this._listener); this.refreshLibrary(); }
     }
+    if (this._detached) return;
     this.child && (this.child.hass = hass);
     if (this.editor?.isConnected && (!this.localEditorSection || (!this.manage && this.localEditorSection.open))) this.editor.hass = hass;
     this.picker && (this.picker.hass = hass);
+    for (const picker of [...(this.buttonVariablePickers || []),...(this.definedInputPickers || [])]) if (picker.isConnected) picker.hass = hass;
     this.manager && (this.manager.hass = hass);
     for (const host of this.shadowRoot.querySelectorAll?.('[data-library-preview]') || []) if (host.previewChild && visibleInSections(host)) host.previewChild.hass = hass;
   }
@@ -390,6 +396,7 @@ class Base extends HTMLElement {
     return true;
   }
   refreshLibrary() {
+    if (this._detached) return;
     try { this.libraryChanged(); }
     catch (error) { this.fail(error); }
   }
@@ -408,6 +415,8 @@ class LibraryCard extends Base {
     if (!this.state.library) { this.signature = null; this.child = null; this.showUnavailable('Vorlagenkarte'); return; }
     try {
       let {config, signature, decorations} = resolvedCard(this.state, this.config);
+      const errors = inputErrors(this.state.library.templates[this.config.template],config);
+      if (errors.length) throw Error(errors.join(' · '));
       if (this.config.popup_content) {
         const native = popupTemplateInfo(config);
         if (native) {
@@ -440,7 +449,7 @@ class LibraryCard extends Base {
 class LibraryContainerCard extends HTMLElement {
   constructor() { super(); this.attachShadow({mode:'open'}); }
   setConfig(config) { validateCard(config); this.config = clone(config); this.render(); }
-  set hass(value) { this._hass = value; if (this.child) this.child.hass = value; else this.render(); }
+  set hass(value) { this._hass = value; if (this._detached) return; if (this.child) this.child.hass = value; else this.render(); }
   connectedCallback() { this._detached = false; this.render(); }
   disconnectedCallback() { this._detached = true; this.token = (this.token || 0) + 1; }
   getCardSize() { return this.child?.getCardSize?.() ?? 1; }
@@ -474,6 +483,27 @@ class LibraryContainerCard extends HTMLElement {
   }
 }
 class LibraryEditor extends Base {
+  libraryViewSignature() {
+    const library = this.state?.library;
+    if (!library || !this.config) return null;
+    const id = this.config.template;
+    const template = Object.hasOwn(library.templates, id) ? library.templates[id] : null;
+    let fingerprint;
+    if (template) {
+      try { fingerprint = requestedTemplate(library, id).requested.fingerprint; }
+      catch (error) { fingerprint = ['invalid', error.message || String(error)]; }
+    }
+    return JSON.stringify([
+      Object.entries(library.templates).map(([key, value]) => [key, value.name]), id, fingerprint,
+      template && Object.fromEntries(Object.keys(template).filter(key => key !== 'config' && key !== 'bindings').map(key => [key,template[key]])),
+    ]);
+  }
+  libraryChanged() {
+    // Unrelated saves must not remount the native form or interrupt typing.
+    // Selected bindings, metadata and selector names still refresh immediately.
+    if (this.state?.library && this.libraryRenderState === this.state && this.libraryRenderSignature === this.libraryViewSignature()) return;
+    this.render();
+  }
   setConfig(config) {
     if (JSON.stringify(config) === JSON.stringify(this.config)) return;
     if (config.template !== this.config?.template) this.resetLocalContext();
@@ -632,14 +662,79 @@ class LibraryEditor extends Base {
       button(section, 'Style wieder aus Vorlage übernehmen', () => apply(true));
     });
   }
+  definedInputPanel(parent,resolved) {
+    this.definedInputPickers=[];
+    const template=this.state.library.templates[this.config.template],definitions=template.inputs || [];
+    if(!definitions.length)return;
+    const section=el('details',undefined,parent);section.open=true;el('summary','Eingaben dieser Verwendung',section);
+    el('p','Nur diese Werte werden örtlich angepasst. Gestaltung und weitere Einstellungen bleiben verknüpft.',section);
+    const id=this.config.template,state=this.state;
+    for(const definition of definitions){
+      const value=getAt(resolved,definition.path),row=el('div',undefined,section),label=definition.label+(definition.required?' *':'');let input;
+      const apply=(next,inherit=false)=>{
+        if(this._detached||!input.isConnected||this.config.template!==id)return;
+        try{this.assertLibraryConnection(state);this.config.overrides=updateLocalField(this.state.library,id,this.config.overrides,definition.path,next,inherit,true);this.syncLocalEditor();this.changed();this.schedulePreview();status.textContent=inputErrors(template,resolveTemplate(this.state.library,id,this.config.overrides)).join(' · ');if(inherit){const current=getAt(resolveTemplate(this.state.library,id,this.config.overrides),definition.path);if(definition.type==='boolean')input.checked=current;else input.value=current ?? '';}}
+        catch(error){status.textContent=error.message;}
+      };
+      if(definition.type==='entity'&&customElements.get('ha-entity-picker')){
+        input=el('ha-entity-picker',undefined,row);input.hass=this._hass;input.label=label;input.value=value ?? '';input.includeDomains=definition.domains;input.allowCustomEntity=true;this.definedInputPickers.push(input);
+        input.addEventListener('value-changed',event=>{if(event.target!==input)return;event.stopPropagation();input.value=event.detail.value ?? '';apply(input.value);});
+      }else if(definition.type==='select')input=select(row,[['','Bitte wählen'],...definition.options.map(option=>[option,option])],value ?? '',next=>apply(next),label);
+      else{input=field(row,label,'input',true,definition.type==='boolean'?'checkbox':definition.type==='number'?'number':'text');if(definition.type==='boolean')input.checked=Boolean(value);else input.value=value ?? '';input.onchange=()=>apply(definition.type==='boolean'?input.checked:definition.type==='number'?(input.value===''?null:Number(input.value)):input.value);}
+      input.required=Boolean(definition.required);const status=el('p','',row);status.className='hint';button(row,'Wert aus Vorlage übernehmen',()=>apply(undefined,true));
+    }
+    for(const error of inputErrors(template,resolved))el('p',error,section).className='error';
+  }
+  buttonVariablePanel(parent, resolved) {
+    this.buttonVariablePickers = [];
+    if (resolved.type !== 'custom:button-card' || !resolved.variables || Array.isArray(resolved.variables) || typeof resolved.variables !== 'object') return;
+    const definitions = this.state.library.templates[this.config.template].inputs || [];
+    const variables = Object.entries(resolved.variables).filter(([key,value]) => !definitions.some(input=>overlap(input.path,['variables',key])) && ( value == null || ['string','number','boolean'].includes(typeof value)));
+    if (!variables.length) return;
+    const section = el('details', undefined, parent); section.open = true;
+    el('summary', 'Entitäten und Variablen dieser Verwendung', section);
+    el('p', 'Hier nur Entitäten, Name und weitere Variablen festlegen. Gestaltung und Logik bleiben mit der Vorlage verknüpft.', section);
+    const state = this.state, id = this.config.template;
+    const captions = {entity_cover:'Rollladen',entity_modus:'Automatikmodus',entity_beschattung:'Beschattungsmodus',entity_override_auto:'Lokale Automatik-Ausnahme',entity_override_besch:'Lokale Beschattungs-Ausnahme',friendly_name:'Anzeigename',nav_anchor:'Popup-Hash ohne #'};
+    for (const [key,value] of variables) {
+      const path = ['variables',key], row = el('div', undefined, section);
+      const locked = this.state.library.templates[id].bindings?.some(binding => overlap(binding.path,path));
+      let input;
+      if ((key === 'entity' || key.startsWith('entity_')) && customElements.get('ha-entity-picker') && typeof value === 'string' && !value.includes('[[[')) {
+        input = el('ha-entity-picker',undefined,row); input.hass = this._hass; input.label = captions[key] || key; input.value = value; input.allowCustomEntity = true; this.buttonVariablePickers.push(input);
+        if (key === 'entity_cover') input.includeDomains = ['cover'];
+      } else {
+        input = field(row,captions[key] || key,'input',true,typeof value === 'boolean' ? 'checkbox' : typeof value === 'number' ? 'number' : 'text');
+        if (typeof value === 'boolean') input.checked = value; else input.value = value ?? '';
+      }
+      input.disabled = Boolean(locked);
+      const status = el('p','',row); status.className = 'hint';
+      const update = (next, inherit=false) => {
+        if (this._detached || !input.isConnected) return;
+        try {
+          this.assertLibraryConnection(state);
+          if (this.config.template !== id) throw Error('Die Vorlagenauswahl wurde geändert.');
+          this.config.overrides = updateLocalField(this.state.library,id,this.config.overrides,path,next,inherit);
+          this.syncLocalEditor(); this.changed(); this.schedulePreview(); status.textContent = inherit ? 'Wieder mit Vorlage verknüpft.' : 'Örtliche Änderung. Anschließend das Dashboard speichern.';
+          if (inherit) { const current = getAt(resolveTemplate(this.state.library,id,this.config.overrides),path); if (typeof value === 'boolean') input.checked = current; else input.value = current ?? ''; }
+        } catch (error) { status.textContent = error.message; }
+      };
+      if (input.tagName?.toLowerCase() === 'ha-entity-picker') input.addEventListener('value-changed',event => { if (event.target !== input) return; event.stopPropagation(); input.value = event.detail.value ?? ''; update(input.value); });
+      else input.onchange = () => update(typeof value === 'boolean' ? input.checked : typeof value === 'number' ? Number(input.value) : input.value);
+      const reset = button(row,'Wert aus Vorlage übernehmen',()=>update(undefined,true)); reset.disabled = Boolean(locked);
+    }
+  }
   changed() { this.popupUsageRefresh?.(); this.dispatchEvent(new CustomEvent('config-changed', {detail: {config: clone(this.config)}, bubbles: true, composed: true})); }
   render() {
+    if (this._detached) return;
+    this.libraryRenderState = this.state;
+    this.libraryRenderSignature = this.libraryViewSignature();
     this.popupUsageRefresh = null;
     if (!this.config) return;
     if (this.showUnavailable('Vorlage auswählen')) return;
     const card = this.shell('Vorlagenkarte');
     if (this.notice) el('p', this.notice, card).className = 'error';
-    const admin = this._hass.user?.is_admin;
+    const admin = this._hass.user?.is_admin && !this.usageEditing;
     if (!admin) this.manage = false;
     const tabs = el('nav', undefined, card); tabs.className = 'library-nav workflow-tabs'; tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', 'Vorlagenkarte');
     for (const [manage, label] of [[false, 'Vorlagen einsetzen'], ...(admin ? [[true, 'Konfiguration']] : [])]) {
@@ -671,9 +766,10 @@ class LibraryEditor extends Base {
     }
     el('p', 'Vorlage auswählen. Lokale Änderungen gelten nur für diese Verwendung; übrige Felder bleiben verknüpft.', panel).className = 'workflow-description';
     const selection = el('fieldset', undefined, panel); el('legend', 'Vorlage auswählen', selection);
-    select(selection, [['', 'Vorlage auswählen'], ...Object.entries(this.state.library.templates).map(([id, t]) => [id, t.name])], this.config.template, id => {
+    const templateSelect = select(selection, [['', 'Vorlage auswählen'], ...Object.entries(this.state.library.templates).map(([id, t]) => [id, t.name])], this.config.template, id => {
       this.config.template = id; this.resetLocalContext(); this.notice = ''; this.config.overrides = []; this.changed(); this.render();
     });
+    templateSelect.disabled = Boolean(this.usageEditing);
     if (!Object.keys(this.state.library.templates).length) el('p', admin ? 'Noch keine Vorlagen vorhanden. Im Reiter Konfiguration eine Vorlage erstellen oder importieren.' : 'Ein Administrator muss zuerst Vorlagen erstellen oder importieren.', panel);
     if (!this.config.template) return;
     // Recovery must stay available even if old overrides no longer resolve.
@@ -683,7 +779,9 @@ class LibraryEditor extends Base {
     button(inheritance, 'Lokale Anpassungen zurücksetzen', reset);
     try {
       const resolved = resolveTemplate(this.state.library, this.config.template, this.config.overrides);
-      popupUsage(panel, this, this.config.template, this.config.overrides || []);
+      this.definedInputPanel(panel,resolved);
+      this.buttonVariablePanel(panel, resolved);
+      if(!this.usageEditing)popupUsage(panel, this, this.config.template, this.config.overrides || []);
       const previewSection = el('details', undefined, panel); el('summary', 'Vorschau dieser Verwendung', previewSection);
       this.localPreviewSection = previewSection;
       const preview = this.localPreview = el('div', undefined, previewSection);
@@ -777,6 +875,7 @@ class LibraryManager extends Base {
     this.saving = false; this.render();
   }
   render() {
+    if (this._detached) return;
     this.liveUI = false;
     this.popupRouteRefresh = null;
     this.popupUsageRefresh = null;
@@ -792,16 +891,19 @@ class LibraryManager extends Base {
     const saveBar = el('div', undefined, card); saveBar.className = 'save-bar';
     this.statusBadge = el('span', this.dirty ? 'Ungespeicherte Änderungen' : 'Alles gespeichert', saveBar); this.statusBadge.className = 'status-badge'; this.statusBadge.setAttribute('aria-live', 'polite');
     this.saveButton = button(saveBar, 'Zentrale Änderungen speichern', () => this.save()); this.saveButton.className = 'primary'; this.saveButton.disabled = !this.dirty;
+    const review=button(saveBar,'Änderungsvorschau',()=>{this.mode='review';this.render();if(!this.inventory)this.scan();});review.disabled=!this.dirty;
     if (this.renderTools(card)) return;
     const mode = this.mode || 'templates';
-    select(card, [['', mode === 'groups' ? 'Einstellung auswählen' : 'Vorlage auswählen'], ...Object.entries(this.draft[mode]).map(([id, t]) => [id, t.name])], this.selected, id => { this.selected = id; this.path = null; this.groupPath = null; this.render(); });
+    if(mode==='templates')this.templateFilters(card);
+    select(card, [['', mode === 'groups' ? 'Einstellung auswählen' : 'Vorlage auswählen'], ...(mode==='templates'?this.filteredTemplates():Object.entries(this.draft[mode])).map(([id, t]) => [id, t.name])], this.selected, id => { this.selected = id; this.path = null; this.groupPath = null; this.inputDraft=null;this.inputEditingPath=null;this.render(); });
     const item = this.draft[mode][this.selected];
     if (!item) {
       el('p', mode === 'templates' ? 'Vorlage auswählen oder unter „Vorlage hinzufügen“ eine Karte erstellen bzw. übernehmen.' : 'Gemeinsame Einstellung auswählen. Neue Einstellungen in der Vorlage verknüpfen.', card);
       return;
     }
     const name = field(card, mode === 'groups' ? 'Name der Einstellung' : 'Name der Vorlage'); name.value = item.name; name.setAttribute('aria-label', 'Name');
-    name.onchange = () => { item.name = name.value; this.edit(); };
+    name.readOnly=Boolean(mode==='templates'&&(item.protected||this.state.library.templates[this.selected]?.protected));
+    name.onchange = () => { if(!name.readOnly){item.name = name.value; this.edit();} };
     const itemActions = el('details', undefined, card); itemActions.className = 'item-actions'; el('summary', mode === 'groups' ? 'Einstellungsaktionen' : 'Vorlagenaktionen', itemActions);
     button(itemActions, 'Löschen', () => this.run(() => this.deleteItem(mode, this.selected))).className = 'danger';
     if (mode === 'groups') {
@@ -812,6 +914,8 @@ class LibraryManager extends Base {
       return;
     }
     try { resolveTemplate(this.draft,this.selected); } catch (error) { el('p', error.message || String(error), card).className='error'; return; }
+    if(this.protectionPanel(card,item))return;
+    this.metadataPanel(card,item);
     el('p', 'Kartentyp: ' + item.config.type, card);
     el('h3', 'Zentrale Vorlage bearbeiten', card);
     popupRouteSettings(card, this, item);
@@ -1034,6 +1138,7 @@ class LibraryManager extends Base {
   }
 }
 installTools(LibraryManager, {el, field, button, select, tree, whenOpen});
+installWorkflows(LibraryManager, {el,field,button,select,whenOpen});
 LibraryEditor.prototype.previewCard = LibraryManager.prototype.previewCard;
 class LibraryManagerEditor extends LibraryManager {}
 customElements.define('library-container-card', LibraryContainerCard);

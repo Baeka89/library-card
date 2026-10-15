@@ -1,5 +1,5 @@
-import {clone, validateJson, validatePopupRoutes, validatePopupContent, popupTemplateInfo, popupTemplateRoutes, getAt, resolveTemplate} from './library-core.js?v=0.5.1';
-import {createRenderedCard} from './library-ha-ui.js?v=0.5.1';
+import {clone, validateJson, validatePopupRoutes, validatePopupContent, popupTemplateInfo, popupTemplateRoutes, getAt, resolveTemplate, inputErrors} from './library-core.js?v=0.5.2';
+import {createRenderedCard} from './library-ha-ui.js?v=0.5.2';
 
 export function bubblePopupConfig(action, hash, templateConfig) {
   validateJson(action);
@@ -315,6 +315,8 @@ export function createPopupHashRouter(env, controller, reportError = () => {}) {
         nativeFrame = nativeFrames.get(cacheKey);
         if (!nativeFrame) {
           const config = resolveTemplate(libraryState, action.template,action.overrides || []);
+          const errors = inputErrors(libraryState.templates[action.template],config);
+          if (errors.length) throw Error(errors.join(' · '));
           const info = validatePopupContent(config), frame = info ? getAt(config, info.path) : {};
           const options = Object.fromEntries(Object.entries(frame).filter(([key]) => !['type','card_type','hash','cards'].includes(key)));
           nativeFrame = {config,options,mode:info ? info.path.length ? 'legacy-stack' : 'standalone' : 'content',contentKey:info && !info.path.length ? JSON.stringify(frame.cards) : undefined};
@@ -322,7 +324,14 @@ export function createPopupHashRouter(env, controller, reportError = () => {}) {
           nativeFrames.set(cacheKey,nativeFrame);
         }
         action = {...action, popup:{...nativeFrame.options,...action.popup}};
-      } catch (error) { requestKey = null; reportError(error); return; }
+      } catch (error) {
+        requestKey = null;
+        // A central change can invalidate an already visible native popup.
+        // Remove its stale content and cancel pending imports, retaining the
+        // selected hash so a corrected template reopens without another click.
+        controller.suspend();
+        reportError(error); return;
+      }
     }
     const key = JSON.stringify([env.window.location.pathname, hash, action, nativeFrame?.mode || 'content']);
     const app = controller.getApplicationRoot?.();

@@ -49,7 +49,13 @@ function setup(state = library(), inventoryCards = []) {
   const manager = document.createElement('library-manager'); manager.hass=hass; callback(state);
   return {manager,hass,saved,push:state=>callback(state)};
 }
-function openSection(root, title) { const section=nodes(root).find(n=>tag(n)==='details'&&n.children.some(c=>c.textContent===title));assert.ok(section,title);section.open=true;section.dispatchEvent({type:'toggle'});return section; }
+function openSection(root, title) {
+  const section=nodes(root).find(n=>tag(n)==='details'&&n.children.some(c=>c.textContent===title));assert.ok(section,title);
+  function path(node) { if(node===section)return [node];for(const child of node.children){const branch=path(child);if(branch)return [node,...branch];} }
+  // Real users reach a nested disclosure by opening its ancestors first.
+  for(const ancestor of path(root).filter(node=>tag(node)==='details')) {ancestor.open=true;ancestor.dispatchEvent({type:'toggle'});}
+  return section;
+}
 async function settle() { await new Promise(resolve=>setImmediate(resolve)); }
 
 test('native graphical editor changes are saved with people and template configuration', async () => {
@@ -383,6 +389,48 @@ test('incoming library updates preserve an unsaved native editor and show the re
   native.dispatchEvent(new CustomEvent('config-changed',{detail:{config:{...native.config,title:'Typing'}},stopPropagation(){}}));
   const changed=library();changed.revision=1;push(changed);await settle();assert.equal(manager.editor,native);assert.equal(manager.draft.templates.calendar.config.title,'Typing');assert.match(manager.conflictNode.textContent,/anderswo/);
 });
+
+test('unrelated library saves preserve the local native form and unsubmitted YAML', async () => {
+  const state = library(); state.templates.other = {name:'Andere Karte',config:{type:'markdown',content:'Before'}};
+  const {hass,push} = setup(state);
+  const editor = document.createElement('library-card-editor'); editor.setConfig({template:'calendar'}); editor.hass = hass;
+  openSection(editor.shadowRoot,'Örtliche Anpassungen'); await settle();
+  const native = editor.editor, frame = editor.shadowRoot.children.at(-1);
+  const section = openSection(editor.shadowRoot,'Vollständige lokale Konfiguration (YAML)');
+  const source = nodes(section).find(node=>tag(node)==='textarea'); source.value = 'type: custom:calendar\ntitle: Still typing'; source.oninput();
+  let updates = 0; native.setConfig = config=>{updates++;native.config=config;};
+  const next = structuredClone(state); next.revision++; next.templates.other.config.content = 'After'; next.people.anna.name = 'Unused name';
+  push(next); await settle();
+  assert.equal(editor.shadowRoot.children.at(-1),frame); assert.equal(editor.editor,native); assert.equal(updates,0);
+  assert.equal(source.value,'type: custom:calendar\ntitle: Still typing'); assert.equal(editor.localYamlDraft.text,source.value);
+});
+
+test('local forms still refresh selected bindings, input definitions and selector names', async () => {
+  let state = library(); state.templates.calendar.bindings = [{path:['color'],person:'anna',field:'color'}];
+  const {hass,push} = setup(state);
+  const editor = document.createElement('library-card-editor'); editor.setConfig({template:'calendar'}); editor.hass = hass;
+  openSection(editor.shadowRoot,'Örtliche Anpassungen'); await settle();
+  const native = editor.editor;
+  state = structuredClone(state); state.revision++; state.people.anna.color = '#112233'; push(state); await settle();
+  assert.equal(editor.editor,native); assert.equal(native.config.color,'#112233');
+  state = structuredClone(state); state.revision++; state.templates.calendar.inputs = [{path:['title'],label:'Name dieser Karte',type:'text'}]; push(state); await settle();
+  assert.ok(inputField(editor.shadowRoot,'Name dieser Karte'));
+  state = structuredClone(state); state.revision++; state.templates.calendar.name = 'Neuer Name'; push(state); await settle();
+  assert.ok(nodes(editor.shadowRoot).filter(node=>tag(node)==='select').some(node=>options(node).some(option=>option.textContent==='Neuer Name')));
+});
+
+for (const type of ['library-card','library-card-editor','library-manager']) test(`detached ${type} stays unwatched across HA connection changes and resumes on reconnect`, async () => {
+  const {hass} = setup(); const owner = document.createElement(type); owner.setConfig({template:'calendar'}); owner.hass = hass; await settle();
+  owner.disconnectedCallback();
+  let receive; const next = {...hass,connection:{subscribeMessage:async callback=>{receive=callback;return()=>{};}}};
+  const frame = owner.shadowRoot.children;
+  owner.hass = next; receive({...library(),revision:1}); await settle();
+  assert.equal(owner.state.listeners.has(owner._listener),false); assert.equal(owner.shadowRoot.children,frame);
+  owner.connectedCallback(); await settle();
+  assert.equal(owner.state.listeners.has(owner._listener),true);
+  if (type === 'library-card') assert.equal(owner.child.config.layout,'month');
+  else assert.notEqual(owner.shadowRoot.children,frame);
+});
 test('direct YAML import adds one card and retains existing templates and the full configuration', async () => {
   const {manager,hass}=setup();const previous=hass.callWS;hass.callWS=async msg=>msg.type==='card_library/parse_card'?{type:'custom:energy-flow-card-plus',title:'Energiefluss',entities:{solar:{entity:'sensor.solar'}}}:previous(msg);
   find(manager.shadowRoot,'Karte aus YAML').click();const text=nodes(manager.shadowRoot).find(n=>tag(n)==='textarea');text.value='type: custom:energy-flow-card-plus\ntitle: Energiefluss';text.oninput();await find(manager.shadowRoot,'YAML als Karte übernehmen').click();
@@ -396,7 +444,7 @@ test('navigation groups creation and maintenance actions into closed menus', () 
   const {manager}=setup();const menus=nodes(manager.shadowRoot).filter(n=>tag(n)==='details');
   const creation=menus.find(n=>n.children.some(c=>c.textContent==='Vorlage hinzufügen'));const tools=menus.find(n=>n.children.some(c=>c.textContent==='Werkzeuge'));assert.ok(creation);assert.ok(tools);assert.ok(!creation.open&&!tools.open);
   find(creation,'Neue Karte');find(creation,'Karte aus YAML');find(creation,'Dashboards / Übernahme');find(tools,'Bibliothek exportieren');find(tools,'Versionsverlauf');find(tools,'Entwurf verwerfen / neu laden');
-  const area=nodes(manager.shadowRoot).find(n=>tag(n)==='select'&&options(n).some(c=>c.value==='people'));assert.equal(options(area).length,3);assert.equal(area.value,'templates');
+  const area=nodes(manager.shadowRoot).find(n=>tag(n)==='select'&&options(n).some(c=>c.value==='people'));assert.equal(options(area).length,4);assert.equal(area.value,'templates');
   area.value='people';area.onchange();assert.equal(manager.mode,'people');const updated=nodes(manager.shadowRoot).find(n=>tag(n)==='select'&&options(n).some(c=>c.value==='groups'));updated.value='groups';updated.onchange();assert.equal(manager.mode,'groups');
 });
 test('save status updates without rebuilding the native editor and only enables for dirty drafts', async () => {
@@ -1353,4 +1401,159 @@ test('late rebuilds from loaded cards cannot restart removed references or foote
     }
     assert.equal(calls, 0);
   } finally {window.loadCardHelpers = original;}
+});
+
+test('button-card parameters stay local while design and other variables remain inherited',async()=>{
+  const state=library();state.templates.shutter={name:'Rollladen',config:{type:'custom:button-card',variables:{entity_cover:'',entity_modus:'',friendly_name:'Fenster',nav_anchor:'rolllade_info'},entity:'[[[ return variables.entity_cover; ]]]',styles:{card:[{padding:'12px'}]}},bindings:[]};
+  const {hass,push}=setup(state);const editor=document.createElement('library-card-editor');editor.setConfig({type:'custom:library-card',template:'shutter'});editor.hass=hass;
+  const cover=inputField(editor.shadowRoot,'Rollladen');cover.value='cover.kueche';cover.onchange();
+  const name=inputField(editor.shadowRoot,'Anzeigename');name.value='Küche';name.onchange();
+  assert.deepEqual(editor.config.overrides,[{path:['variables','entity_cover'],value:'cover.kueche'},{path:['variables','friendly_name'],value:'Küche'}]);
+  assert.equal(editor.state.library.templates.shutter.config.variables.entity_cover,'');
+  const changed=structuredClone(state);changed.revision=1;changed.templates.shutter.config.styles.card=[{padding:'20px'}];changed.templates.shutter.config.variables.nav_anchor='new-menu';push(changed);
+  const {resolveTemplate}=await import('../custom_components/card_library/frontend/library-core.js');
+  const result=resolveTemplate(editor.state.library,'shutter',editor.config.overrides);assert.equal(result.variables.entity_cover,'cover.kueche');assert.equal(result.variables.nav_anchor,'new-menu');assert.equal(result.styles.card[0].padding,'20px');
+  const input=inputField(editor.shadowRoot,'Rollladen');const row=input.libraryParent.libraryParent;find(row,'Wert aus Vorlage übernehmen').click();
+  assert.equal(resolveTemplate(editor.state.library,'shutter',editor.config.overrides).variables.entity_cover,'');assert.equal(resolveTemplate(editor.state.library,'shutter',editor.config.overrides).variables.friendly_name,'Küche');
+});
+
+test('button-card entity picker writes one local override and follows current hass',()=>{
+  class Picker extends Element {constructor(){super('ha-entity-picker');}}
+  registry.set('ha-entity-picker',Picker);
+  try {
+    const state=library();state.templates.shutter={name:'Shutter',config:{type:'custom:button-card',variables:{entity_cover:''}},bindings:[]};
+    const {hass}=setup(state);const editor=document.createElement('library-card-editor');editor.setConfig({type:'custom:library-card',template:'shutter'});editor.hass=hass;
+    const picker=nodes(editor.shadowRoot).find(n=>n.tagName==='ha-entity-picker');assert.deepEqual(picker.includeDomains,['cover']);
+    picker.dispatchEvent({type:'value-changed',target:picker,detail:{value:'cover.flur'},stopPropagation(){}});
+    assert.deepEqual(editor.config.overrides,[{path:['variables','entity_cover'],value:'cover.flur'}]);
+    const updated={...hass,states:{'cover.flur':{state:'open'}}};editor.hass=updated;assert.equal(picker.hass,updated);
+  } finally {registry.delete('ha-entity-picker');}
+});
+
+test('button-card batch YAML import creates named drafts and preserves existing templates',async()=>{
+  const {manager,hass,saved}=setup();const original=hass.callWS;hass.callWS=async message=>message.type==='card_library/parse_templates' ? [{name:'base',config:{type:'custom:button-card'},bindings:[]},{name:'rolladen_karte',config:{type:'custom:button-card',variables:{entity_cover:''}},bindings:[]}] : original(message);
+  manager.mode='yaml';manager.yamlDraft='button_card_templates:\n  base: {}\n  rolladen_karte: {}';manager.render();await find(manager.shadowRoot,'YAML als Karte übernehmen').click();
+  assert.equal(Object.keys(manager.draft.templates).length,3);assert.equal(manager.draft.templates[manager.selected].name,'rolladen_karte');assert.equal(manager.dirty,true);assert.equal(saved.length,0);assert.ok(manager.draft.templates.calendar);
+});
+
+test('invalid button-card batch response cannot partially replace the library draft',async()=>{
+  const {manager,hass}=setup();hass.callWS=async()=>[{name:'valid',config:{type:'custom:button-card'}},{name:'bad',config:{title:'Missing type'}}];
+  manager.mode='yaml';manager.yamlDraft='button_card_templates:\n  a: {}';manager.render();const before=structuredClone(manager.draft);
+  await find(manager.shadowRoot,'YAML als Karte übernehmen').click();assert.deepEqual(manager.draft,before);assert.equal(Boolean(manager.dirty),false);assert.match(manager.notice,/Kartentyp/);
+});
+
+test('usage overview lists counts, unused templates and dashboard links without modifying drafts',()=>{
+  const state=library();state.templates.popup={name:'Menü',config:{type:'markdown',content:'Popup'},popup:{hash:'#Menu'},bindings:[]};
+  const {manager}=setup(state);manager.inventory={scannedAt:new Date().toISOString(),failures:[],cards:[
+    {dashboard:'Familie',view:'Wohnzimmer',view_path:'wohnzimmer',url_path:'dashboard-main',path:['views',0,'cards',0],config:{type:'custom:library-card',template:'calendar'}},
+    {dashboard:'Familie',view:'Wohnzimmer',view_path:'wohnzimmer',url_path:'dashboard-main',path:['views',0,'cards',1],config:{type:'button',tap_action:{action:'navigate',navigation_path:'#Menu'}}}
+  ]};manager.mode='usage';const before=structuredClone(manager.draft);manager.render();
+  assert.ok(nodes(manager.shadowRoot).some(node=>node.textContent==='Kalender · 1 Fundstelle'));
+  assert.ok(nodes(manager.shadowRoot).some(node=>node.textContent==='0 Kartenverknüpfungen · 1 Popup-Aufruf'));
+  const links=nodes(manager.shadowRoot).filter(node=>tag(node)==='a');assert.ok(links.some(link=>link.href==='/dashboard-main/wohnzimmer'));assert.ok(links.some(link=>link.href==='/dashboard-main/wohnzimmer#Menu'));
+  assert.deepEqual(manager.draft,before);find(manager.shadowRoot,'Vorlage bearbeiten').click();assert.equal(manager.mode,'templates');
+});
+
+test('usage overview shows unknown counts before scanning and incomplete-scan warning afterward',()=>{
+  const {manager}=setup();manager.mode='usage';manager.render();assert.ok(nodes(manager.shadowRoot).some(node=>String(node.textContent || '').includes('Noch nicht geprüft')));assert.ok(!nodes(manager.shadowRoot).some(node=>node.textContent==='Kalender · 0 Fundstellen'));
+  manager.inventory={scannedAt:new Date().toISOString(),failures:['Privates Dashboard: Zugriff verweigert'],cards:[]};manager.render();
+  assert.ok(nodes(manager.shadowRoot).some(node=>String(node.textContent || '').includes('Prüfung unvollständig')));assert.ok(nodes(manager.shadowRoot).some(node=>String(node.textContent || '').includes('Weitere Verwendungen sind möglich')));
+});
+
+test('usage overview automatically scans on selection and prevents old-connection inventories',async()=>{
+  const {manager,hass}=setup();const selection=inputField(manager.shadowRoot,'Konfigurationsbereich');selection.value='usage';selection.onchange();await settle();
+  assert.ok(manager.inventory);assert.equal(manager.mode,'usage');
+  let complete;const original=hass.callWS;hass.callWS=message=>message.type==='lovelace/dashboards/list'?new Promise(resolve=>{complete=resolve;}):original(message);const pending=manager.scan();
+  manager.hass={...hass,connection:{subscribeMessage:async()=>()=>{}},callWS:async()=>[]};assert.equal(manager.inventory,null);
+  complete([]);await pending;assert.equal(manager.inventory,null);
+});
+
+test('category search filters templates and metadata fields persist in central drafts',()=>{
+  const state=library();state.templates.calendar.category='Kalender';state.templates.light={name:'Licht',category:'Beleuchtung',config:{type:'button'},bindings:[]};
+  const {manager}=setup(state);manager.templateSearch='Licht';manager.render();assert.deepEqual(manager.filteredTemplates().map(([id])=>id),['light']);manager.templateSearch='';manager.templateCategory='Kalender';assert.deepEqual(manager.filteredTemplates().map(([id])=>id),['calendar']);
+  manager.templateCategory=null;manager.selected='calendar';manager.render();inputField(manager.shadowRoot,'Kategorie').value='Familie';inputField(manager.shadowRoot,'Kategorie').onchange();assert.equal(manager.draft.templates.calendar.category,'Familie');assert.equal(manager.dirty,true);
+});
+test('defined required entity inputs create local exceptions while preserving design',async()=>{
+  const state=library();state.templates.calendar.inputs=[{path:['entity'],label:'Kalenderentität',type:'entity',required:true,domains:['calendar']}];
+  const {hass}=setup(state);const editor=document.createElement('library-card-editor');editor.setConfig({type:'custom:library-card',template:'calendar'});editor.hass=hass;
+  const input=inputField(editor.shadowRoot,'Kalenderentität *');input.value='calendar.local';input.onchange();
+  assert.deepEqual(editor.config.overrides,[{path:['entity'],value:'calendar.local'}]);assert.equal(editor.state.library.templates.calendar.config.entity,undefined);
+  const card=document.createElement('library-card');card.setConfig({type:'custom:library-card',template:'calendar'});card.hass=hass;await settle();assert.equal(card.child,null);assert.ok(nodes(card.shadowRoot).some(node=>String(node.textContent).includes('Pflichtfeld fehlt')));
+});
+test('protected templates show read-only UI and require central unlock before editing',async()=>{
+  const state=library();state.templates.calendar.protected=true;const {manager}=setup(state);manager.selected='calendar';manager.render();await settle();
+  assert.equal(inputField(manager.shadowRoot,'Name der Vorlage').readOnly,true);assert.ok(!nodes(manager.shadowRoot).some(node=>node.textContent==='Zentrale Vorlage bearbeiten'));
+  find(manager.shadowRoot,'Schutz aufheben').click();assert.equal(manager.draft.templates.calendar.protected,false);assert.ok(nodes(manager.shadowRoot).some(node=>String(node.textContent).includes('zuerst zentral speichern')));
+});
+test('selected-template rollback preserves other templates and shared values',async()=>{
+  const {manager}=setup();manager.draft.groups.g={name:'Current group',value:'current'};
+  const snapshot={library:{templates:{calendar:{name:'Old calendar',config:{type:'custom:calendar',layout:'old'},bindings:[]}},groups:{g:{name:'Old group',value:'old'}},people:{}}};
+  await manager.restoreTemplate(snapshot,'calendar');assert.equal(manager.draft.templates.calendar.config.layout,'old');assert.equal(manager.draft.groups.g.value,'current');assert.equal(manager.dirty,true);
+});
+test('local use editor preserves placement, exports changes and saves only that dashboard reference',async()=>{
+  const source={dashboard:'Home',view:'Main',url_path:null,path:['views',0,'cards',0],config:{type:'custom:library-card',template:'calendar',grid_options:{columns:6}}};
+  const {manager,hass}=setup();const original=hass.callWS;let write;
+  hass.callWS=async message=>message.type==='card_library/dashboard_get'?{mode:'storage',fingerprint:'a'.repeat(64),config:{views:[{cards:[source.config]}]}}:message.type==='card_library/dashboard_write'?(write=message,{mode:'storage',fingerprint:'b'.repeat(64),config:{views:[{cards:[message.value]}]}}):original(message);
+  await manager.openUsage(source);assert.equal(manager.mode,'local-use');const editor=nodes(manager.shadowRoot).find(node=>node instanceof customElements.get('library-card-editor'));
+  editor.dispatchEvent(new CustomEvent('config-changed',{detail:{config:{...source.config,overrides:[{path:['layout'],value:'local'}]}},stopPropagation(){}}));
+  const exported=inputField(manager.shadowRoot,'Konfiguration dieser Verwendung');assert.match(exported.value,/local/);
+  await manager.saveUsage();assert.equal(write.value.grid_options.columns,6);assert.equal(write.value.overrides[0].value,'local');assert.equal(manager.state.library.templates.calendar.config.layout,'month');
+});
+test('local use refuses a moved or changed dashboard card before opening an editor',async()=>{
+  const {manager,hass}=setup();hass.callWS=async()=>({mode:'storage',fingerprint:'a'.repeat(64),config:{views:[{cards:[{type:'custom:library-card',template:'other'}]}]}});
+  await assert.rejects(()=>manager.openUsage({path:['views',0,'cards',0],config:{type:'custom:library-card',template:'calendar'}}),/geändert oder verschoben/);
+});
+test('duplicating local use keeps source settings and writes an appended link at the selected target',async()=>{
+  const source={dashboard:'Home',view:'Main',url_path:null,path:['views',0,'cards',0],config:{type:'custom:library-card',template:'calendar',overrides:[{path:['layout'],value:'local'}]}};
+  const {manager,hass}=setup();const original=hass.callWS;let write;hass.callWS=async message=>message.type==='card_library/dashboard_get'?{mode:'storage',fingerprint:'a'.repeat(64),config:{views:[{cards:[source.config]}]}}:message.type==='card_library/dashboard_write'?(write=message,{}):original(message);
+  await manager.openUsage(source);await manager.duplicateUsage({url_path:'dashboard-other',path:['views',0,'cards']});
+  assert.equal(write.operation,'append');assert.equal(write.dashboard,'dashboard-other');assert.equal(write.value.overrides[0].value,'local');assert.deepEqual(source.config.overrides,[{path:['layout'],value:'local'}]);
+});
+test('comparison and change preview show local exceptions that prevent central changes',()=>{
+  const {manager}=setup();const use={dashboard:'Home',view:'Main',path:['views',0,'cards',0],config:{type:'custom:library-card',template:'calendar',overrides:[{path:['layout'],value:'local'}]}};
+  manager.inventory={cards:[use],failures:[],scannedAt:new Date().toISOString()};manager.draft.templates.calendar.config.layout='new';manager.edit();manager.mode='review';manager.render();
+  assert.ok(nodes(manager.shadowRoot).some(node=>String(node.textContent).includes('durch lokale Ausnahmen unverändert')));
+  manager.comparePair=[use,{...use,config:{type:'custom:library-card',template:'calendar'}}];manager.mode='compare-use';manager.render();assert.ok(nodes(manager.shadowRoot).some(node=>String(node.textContent).includes('unterschiedliche Felder')));
+});
+
+test('input-definition editor adds required domain-restricted fields and can edit them',()=>{
+  const {manager}=setup();manager.selected='calendar';manager.render();
+  inputField(manager.shadowRoot,'Feldpfad').value='entity';inputField(manager.shadowRoot,'Beschriftung').value='Hauptentität';inputField(manager.shadowRoot,'Pflichtfeld').checked=true;inputField(manager.shadowRoot,'Entitätsdomänen (optional, mit Komma)').value='calendar';
+  find(manager.shadowRoot,'Eingabefeld speichern').click();assert.deepEqual(manager.draft.templates.calendar.inputs,[{path:['entity'],label:'Hauptentität',type:'entity',required:true,domains:['calendar']}]);
+  find(manager.shadowRoot,'Eingabefeld bearbeiten').click();inputField(manager.shadowRoot,'Beschriftung').value='Kalender';find(manager.shadowRoot,'Eingabefeld speichern').click();assert.equal(manager.draft.templates.calendar.inputs.length,1);assert.equal(manager.draft.templates.calendar.inputs[0].label,'Kalender');
+});
+test('hash-use editing persists only its alias overrides and refuses to discard central drafts',async()=>{
+  const state=library();state.templates.calendar.popup_links=[{hash:'#local',overrides:[{path:['layout'],value:'agenda'}]}];
+  const source={dashboard:'Home',view:'Main',url_path:null,card_path:['views',0,'cards',0],path:['views',0,'cards',0,'tap_action'],config:{type:'button',tap_action:{action:'navigate',navigation_path:'#local'}},reference:{template:'calendar',popup_hash:'#local'}};
+  const {manager,hass,saved}=setup(state);const original=hass.callWS;hass.callWS=async message=>message.type==='card_library/dashboard_get'?{mode:'storage',fingerprint:'a'.repeat(64),config:{views:[{cards:[source.config]}]}}:original(message);
+  await manager.openUsage(source);manager.localUse.reference.overrides=[{path:['layout'],value:'month-local'}];manager.dirty=true;await assert.rejects(()=>manager.saveUsage(),/Zentralen Entwurf/);assert.equal(saved.length,0);
+  manager.dirty=false;await manager.saveUsage();assert.equal(saved[0].library.templates.calendar.popup_links[0].overrides[0].value,'month-local');assert.equal(saved[0].library.templates.calendar.config.layout,'month');
+});
+test('local preview keeps reference-level card-mod decorators and layout options',async()=>{
+  const {manager}=setup();const use={config:{type:'custom:library-card',template:'calendar',card_mod:{style:'ha-card {color:red}'},grid_options:{columns:6}}};previews.length=0;
+  const host=new Element('div');await manager.previewUsage(host,use);
+  assert.deepEqual(previews.at(-1).card_mod,use.config.card_mod);assert.deepEqual(previews.at(-1).grid_options,{columns:6});
+});
+
+test('invalid input definitions keep entered values so they can be corrected',()=>{
+  const {manager}=setup();manager.selected='calendar';manager.render();
+  inputField(manager.shadowRoot,'Feldpfad').value='type';inputField(manager.shadowRoot,'Beschriftung').value='My field';
+  find(manager.shadowRoot,'Eingabefeld speichern').click();assert.equal(inputField(manager.shadowRoot,'Feldpfad').value,'type');assert.equal(inputField(manager.shadowRoot,'Beschriftung').value,'My field');assert.equal(manager.draft.templates.calendar.inputs,undefined);
+});
+
+test('duplicating hash popups creates an independent hash link and inserts a navigate button',async()=>{
+  const state=library();state.templates.calendar.popup_links=[{hash:'#old',overrides:[{path:['layout'],value:'agenda'}],options:{width_desktop:'600px'}}];
+  const source={dashboard:'Home',view:'Main',url_path:null,card_path:['views',0,'cards',0],path:['views',0,'cards',0,'tap_action'],config:{type:'button',tap_action:{action:'navigate',navigation_path:'#old'}},reference:{template:'calendar',popup_hash:'#old'}};
+  const {manager,hass,saved}=setup(state);const original=hass.callWS;let write;
+  hass.callWS=async message=>message.type==='card_library/dashboard_get'?{mode:'storage',fingerprint:'a'.repeat(64),config:{views:[{cards:[source.config]}]}}:message.type==='card_library/dashboard_write'?(write=message,{}):original(message);
+  await manager.openUsage(source);manager.duplicateHash='#new';await manager.duplicateUsage({url_path:'dashboard-other',path:['views',0,'cards']});
+  assert.equal(write.value.tap_action.action,'navigate');assert.equal(write.value.tap_action.navigation_path,'#new');assert.equal(write.library_revision,1);
+  assert.deepEqual(saved[0].library.templates.calendar.popup_links[0],state.templates.calendar.popup_links[0]);assert.equal(saved[0].library.templates.calendar.popup_links[1].options.width_desktop,'600px');
+});
+test('failed insertion after hash creation reports the preserved alias instead of deleting it',async()=>{
+  const state=library();state.templates.calendar.popup_links=[{hash:'#old'}];
+  const source={dashboard:'Home',view:'Main',url_path:null,card_path:['views',0,'cards',0],path:['views',0,'cards',0,'tap_action'],config:{type:'button',tap_action:{action:'navigate',navigation_path:'#old'}},reference:{template:'calendar',popup_hash:'#old'}};
+  const {manager,hass,saved}=setup(state);const original=hass.callWS;
+  hass.callWS=async message=>message.type==='card_library/dashboard_get'?{mode:'storage',fingerprint:'a'.repeat(64),config:{views:[{cards:[source.config]}]}}:message.type==='card_library/dashboard_write'?Promise.reject(Error('conflict')):original(message);
+  await manager.openUsage(source);manager.duplicateHash='#copy';await assert.rejects(()=>manager.duplicateUsage({url_path:'target',path:['views',0,'cards']}),/Hash-Kopie #copy wurde gespeichert/);assert.equal(saved.length,1);assert.equal(manager.localUse.pendingDuplicateHash,'#copy');
 });

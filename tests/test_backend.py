@@ -1,9 +1,11 @@
 """Exercise backend handlers using a minimal HA adapter, without an HA installation."""
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import copy
 import importlib.util
 import pathlib
 import sys
+import threading
 import types
 import unittest
 from unittest.mock import patch
@@ -107,18 +109,73 @@ class Store:
         self.saved = copy.deepcopy(state)
 
 
+async def run_test_executor(function, *args):
+    """Run HA worker jobs on real threads without socket-dependent loop wakeups.
+
+    This fixture polls completion because managed test sandboxes may deny the
+    event loop's cross-thread Unix-socket send. Production uses HA's executor.
+    """
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(function, *args)
+        while not future.done():
+            await asyncio.sleep(0.001)
+        return future.result()
+
+
 class BackendFixture(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.events = []
         self.store = Store()
         self.state = {'revision': 0, 'templates': {}, 'groups': {}, 'people': {}}
         self.hass = types.SimpleNamespace(data={'card_library': {'state': self.state, 'store': self.store, 'lock': asyncio.Lock()}},
-                                         bus=types.SimpleNamespace(async_fire=lambda name, data: self.events.append((name, data))))
+                                         bus=types.SimpleNamespace(async_fire=lambda name, data: self.events.append((name, data))),
+                                         async_add_executor_job=run_test_executor)
 
     def msg(self, revision=0, value='red'):
         return {'id': 1, 'revision': revision, 'library': {'templates': {}, 'groups': {'g': {'name': 'Colors', 'value': value}}, 'people': {}}}
 
 class BackendTest(BackendFixture):
+    async def test_validation_and_history_restore_run_outside_the_ha_event_loop(self):
+        event_loop_thread = threading.get_ident()
+        original = backend.commit
+        workers = []
+        def worker_commit(*args):
+            workers.append(threading.get_ident())
+            self.assertNotEqual(workers[-1], event_loop_thread)
+            return original(*args)
+        connection = Connection()
+        with patch.object(backend, 'commit', side_effect=worker_commit):
+            await backend.save_library(self.hass, connection, self.msg())
+            await backend.restore_library(self.hass, connection, {'id': 2, 'revision': 1, 'target_revision': 0})
+        self.assertFalse(connection.errors)
+        self.assertEqual(len(workers), 2)
+        self.assertEqual(self.hass.data[backend.DOMAIN]['state']['revision'], 2)
+
+    async def test_reads_see_a_complete_old_revision_while_worker_prepares_a_save(self):
+        entered, release = threading.Event(), threading.Event()
+        original = backend.commit
+        def paused_commit(*args):
+            candidate = original(*args)
+            entered.set()
+            if not release.wait(2):
+                raise AssertionError('Validation worker was not released')
+            return candidate
+        writer, reader = Connection(), Connection()
+        with patch.object(backend, 'commit', side_effect=paused_commit):
+            pending = asyncio.create_task(backend.save_library(self.hass, writer, self.msg()))
+            try:
+                self.assertTrue(await run_test_executor(entered.wait, 2))
+                await backend.get_library(self.hass, reader, {'id': 2})
+                self.assertEqual(reader.results[-1][1], {'revision': 0, 'templates': {}, 'groups': {}, 'people': {}})
+                self.assertEqual(self.state, {'revision': 0, 'templates': {}, 'groups': {}, 'people': {}})
+                self.assertFalse(writer.results)
+                self.assertIsNone(self.store.saved)
+            finally:
+                release.set()
+                await pending
+        self.assertFalse(writer.errors)
+        self.assertEqual(writer.results[-1][1]['revision'], 1)
+
     async def test_concurrent_saves_reject_stale_revision(self):
         first, second = Connection(), Connection()
         await asyncio.gather(backend.save_library(self.hass, first, self.msg()), backend.save_library(self.hass, second, self.msg()))
@@ -367,7 +424,7 @@ class BackendSetupAndSubscriptionTest(BackendFixture):
         with patch.object(backend, 'CardLibraryStore', return_value=self.store) as store_factory, patch.object(backend, 'StaticPathConfig', side_effect=lambda *args: args), patch.object(backend.websocket_api, 'async_register_command', create=True) as commands:
             self.assertTrue(await backend.async_setup_entry(self.hass, None))
         store_factory.assert_called_once_with(self.hass, 1, backend.DOMAIN, atomic_writes=True)
-        self.assertEqual(commands.call_count, 6)
+        self.assertEqual(commands.call_count, 9)
         self.assertEqual(len(registrations), 1)
         self.assertEqual(self.hass.data['card_library']['state']['people'], {})
 
@@ -486,3 +543,210 @@ class FooterYamlTest(unittest.TestCase):
         for source in ('card: {}','card: []','card: {type: markdown}\nmax_width: -1','card: {type: markdown}\nmax_width: true','card: {type: markdown}\nmax_width: wide','card: {type: markdown}\nunsupported: true'):
             with self.subTest(source=source),self.assertRaises(ValueError):
                 backend.parse_card_yaml(source)
+
+class ButtonTemplateImportTest(BackendFixture):
+    def test_convert_named_template_preserves_javascript_and_empty_entity_variables(self):
+        source = '''button_card_templates:
+  rolladen_karte:
+    variables: {entity_cover: '', entity_modus: '', friendly_name: Fenster}
+    entity: '[[[ return variables.entity_cover; ]]]'
+    styles: {card: [{border: '[[[ return variables.entity_modus; ]]]'}]}
+    custom_fields:
+      buttons:
+        card:
+          type: horizontal-stack
+          cards:
+            - type: custom:button-card
+              tap_action:
+                action: call-service
+                service: cover.open_cover
+                target: {entity_id: '[[[ return variables.entity_cover; ]]]'}
+'''
+        entry = backend.parse_templates_yaml(source)[0]
+        self.assertEqual(entry['name'], 'rolladen_karte')
+        self.assertEqual(entry['config']['type'], 'custom:button-card')
+        self.assertEqual(entry['config']['variables']['entity_cover'], '')
+        self.assertEqual(entry['config']['entity'], '[[[ return variables.entity_cover; ]]]')
+        self.assertEqual(entry['config']['custom_fields']['buttons']['card']['cards'][0]['tap_action']['target']['entity_id'], '[[[ return variables.entity_cover; ]]]')
+        self.assertEqual(backend.parse_card_yaml(source), entry['config'])
+
+    def test_batch_static_inheritance_merges_styles_variables_and_states_by_id(self):
+        entries = backend.parse_templates_yaml('''button_card_templates:
+  base:
+    variables: {entity_cover: '', friendly_name: Fenster}
+    styles: {card: [{padding: 12px}]}
+    state: [{id: active, value: 'on', color: red}]
+  child:
+    template: base
+    variables: {friendly_name: Küche}
+    styles: {card: [{border: none}]}
+    state: [{id: active, color: blue}, {value: 'off'}]
+''')
+        child = entries[1]['config']
+        self.assertNotIn('template', child)
+        self.assertEqual(child['variables'], {'entity_cover': '', 'friendly_name': 'Küche'})
+        self.assertEqual(child['styles']['card'], [{'padding': '12px'}, {'border': 'none'}])
+        self.assertEqual(child['state'], [{'id': 'active', 'value': 'on', 'color': 'blue'}, {'value': 'off'}])
+
+    def test_missing_cyclic_and_dynamic_parents_rejected(self):
+        for source in ["button_card_templates: {a: {template: missing}}", "button_card_templates: {a: {template: b}, b: {template: a}}", "button_card_templates: {a: {template: '[[[ return variables.x; ]]]'}}", "button_card_templates: {}", "button_card_templates: {a: {type: markdown}}", "button_card_templates: {a: {}}\nviews: []"]:
+            with self.subTest(source=source), self.assertRaises((ValueError, TypeError)):
+                backend.parse_templates_yaml(source)
+
+    def test_nested_template_dependencies_are_inlined(self):
+        entries = backend.parse_templates_yaml('''button_card_templates:
+  inner: {show_state: false, icon: 'mdi:stop'}
+  outer:
+    custom_fields:
+      stop:
+        card: {type: 'custom:button-card', template: inner}
+''')
+        child = entries[1]['config']['custom_fields']['stop']['card']
+        self.assertNotIn('template', child)
+        self.assertEqual(child['icon'], 'mdi:stop')
+
+    def test_regular_cards_still_use_the_existing_parser(self):
+        self.assertEqual(backend.parse_templates_yaml('type: markdown\ncontent: hello')[0]['config'], {'type': 'markdown', 'content': 'hello'})
+        with self.assertRaises(ValueError):
+            backend.parse_card_yaml('button_card_templates: {a: {}, b: {}}')
+
+    async def test_batch_parser_is_read_only_and_accepts_non_admins(self):
+        async def executor(function, *args): return function(*args)
+        self.hass.async_add_executor_job = executor
+        connection = Connection(admin=False)
+        await backend.parse_templates(self.hass, connection, {'id':7,'yaml':"button_card_templates: {a: {variables: {entity_cover: ''}}}"})
+        self.assertFalse(connection.errors)
+        self.assertEqual(connection.results[0][1][0]['config']['type'], 'custom:button-card')
+        self.assertIsNone(self.store.saved)
+
+
+class ButtonTemplateBoundsTest(unittest.TestCase):
+    def test_alias_expansion_is_bounded_before_copying(self):
+        source = "button_card_templates:\n  a:\n    variables:\n      value: &a0 ['" + 'x' * 1024 + "']\n"
+        for depth in range(1, 14):
+            source += f"      a{depth}: &a{depth} [*a{depth-1}, *a{depth-1}]\n"
+        with self.assertRaisesRegex(ValueError, 'exceeds 2 MB'):
+            backend.parse_templates_yaml(source)
+
+    def test_parent_extra_styles_are_retained_in_order(self):
+        entries = backend.parse_templates_yaml("button_card_templates:\n  base: {extra_styles: 'a {}'}\n  other: {extra_styles: 'b {}'}\n  child: {template: [base, other], extra_styles: 'c {}'}")
+        self.assertEqual(entries[-1]['config']['extra_styles'], 'a {}\nb {}\nc {}')
+
+class DashboardEditingTest(BackendFixture):
+    def setUp(self):
+        super().setUp()
+        self.state['templates']={'t':{'name':'Template','config':{'type':'entities','entities':['sensor.original']},'inputs':[]}}
+        self.dashboard=types.SimpleNamespace(mode='storage',config={'views':[{'cards':[{'type':'custom:library-card','template':'t'}]}]})
+        self.saved=[]
+        async def load(force):return self.dashboard.config
+        async def save(config):self.dashboard.config=config;self.saved.append(copy.deepcopy(config))
+        self.dashboard.async_load=load;self.dashboard.async_save=save
+        self.hass.data['lovelace']=types.SimpleNamespace(dashboards={None:self.dashboard,'other':self.dashboard})
+    def write(self,operation='replace',**changes):
+        message={'id':1,'dashboard':'','fingerprint':backend.fingerprint(self.dashboard.config),'path':['views',0,'cards',0],'value':{'type':'custom:library-card','template':'t','overrides':[{'path':['entities'], 'value':['sensor.local']}]},'operation':operation,'library_revision':0,'source':{}}
+        return message|changes
+    async def test_local_edit_preserves_placement_and_other_cards(self):
+        self.dashboard.config['views'][0]['cards'][0]['grid_options']={'columns':6}
+        self.dashboard.config['views'][0]['cards'].append({'type':'markdown','content':'unchanged'})
+        message=self.write();message['value']['grid_options']={'columns':6};connection=Connection()
+        await backend.dashboard_write(self.hass,connection,message)
+        self.assertFalse(connection.errors);self.assertEqual(self.saved[0]['views'][0]['cards'][0]['grid_options'],{'columns':6});self.assertEqual(self.saved[0]['views'][0]['cards'][1],{'type':'markdown','content':'unchanged'})
+        self.assertEqual(self.state['templates']['t']['config']['entities'],['sensor.original'])
+    async def test_stale_dashboard_or_library_rejects_without_writing(self):
+        for field,value in [('fingerprint','a'*64),('library_revision',3)]:
+            connection=Connection();await backend.dashboard_write(self.hass,connection,self.write(**{field:value}));self.assertTrue(connection.errors);self.assertFalse(self.saved)
+    async def test_yaml_and_non_admin_cannot_write(self):
+        self.dashboard.mode='yaml';connection=Connection();await backend.dashboard_write(self.hass,connection,self.write());self.assertTrue(connection.errors)
+        self.dashboard.mode='storage';connection=Connection(admin=False);await backend.dashboard_write(self.hass,connection,self.write());self.assertTrue(connection.errors);self.assertFalse(self.saved)
+    async def test_duplicate_appends_link_without_replacing_source(self):
+        origin=copy.deepcopy(self.dashboard.config);connection=Connection()
+        message=self.write('append',path=['views',0,'cards'],source={'dashboard':'','fingerprint':backend.fingerprint(origin)})
+        await backend.dashboard_write(self.hass,connection,message);self.assertFalse(connection.errors);self.assertEqual(self.dashboard.config['views'][0]['cards'][0],origin['views'][0]['cards'][0]);self.assertEqual(len(self.dashboard.config['views'][0]['cards']),2)
+    async def test_changed_duplicate_source_is_rejected(self):
+        connection=Connection();await backend.dashboard_write(self.hass,connection,self.write('append',path=['views',0,'cards'],source={'dashboard':'other','fingerprint':'a'*64}));self.assertTrue(connection.errors);self.assertFalse(self.saved)
+    async def test_required_inputs_and_invalid_paths_are_rejected(self):
+        self.state['templates']['t']['inputs']=[{'path':['entity'],'label':'Entity','type':'entity','required':True}]
+        for changes in [{},{'path':['views',-1,'cards',0]},{'path':['views',0,'cards',0,'__proto__']}]:
+            connection=Connection();await backend.dashboard_write(self.hass,connection,self.write(**changes));self.assertTrue(connection.errors);self.assertFalse(self.saved)
+    async def test_dashboard_snapshot_exposes_mode_and_rejects_non_admins(self):
+        connection=Connection();await backend.dashboard_get(self.hass,connection,{'id':1,'dashboard':''});self.assertEqual(connection.results[-1][1]['mode'],'storage');self.assertEqual(len(connection.results[-1][1]['fingerprint']),64)
+        denied=Connection(admin=False);await backend.dashboard_get(self.hass,denied,{'id':1,'dashboard':''});self.assertTrue(denied.errors)
+    async def test_type_or_template_switch_cannot_replace_reference(self):
+        self.state['templates']['other']={'name':'Other','config':{'type':'markdown'}}
+        for value in [{'type':'custom:library-card','template':'other'},{'type':'button','tap_action':{'action':'fire-dom-event','card_library':{'action':'popup','template':'t'}}}]:
+            connection=Connection();await backend.dashboard_write(self.hass,connection,self.write(value=value));self.assertTrue(connection.errors);self.assertFalse(self.saved)
+
+    async def test_destination_changed_while_reading_duplicate_source_is_rejected(self):
+        origin_config=copy.deepcopy(self.dashboard.config)
+        async def origin_load(force):
+            self.dashboard.config={'views':[{'cards':[{'type':'markdown','content':'concurrent change'}]}]}
+            return origin_config
+        origin=types.SimpleNamespace(mode='storage',async_load=origin_load)
+        self.hass.data['lovelace'].dashboards['source']=origin
+        message=self.write('append',path=['views',0,'cards'],source={'dashboard':'source','fingerprint':backend.fingerprint(origin_config)})
+        connection=Connection();await backend.dashboard_write(self.hass,connection,message)
+        self.assertTrue(connection.errors);self.assertFalse(self.saved);self.assertEqual(self.dashboard.config['views'][0]['cards'][0]['content'],'concurrent change')
+
+    async def test_duplicate_can_target_empty_views_and_refuses_full_panel_views(self):
+        from_config={'views':[{'title':'Empty'}]}
+        self.dashboard.config=from_config
+        connection=Connection();await backend.dashboard_write(self.hass,connection,self.write('append',path=['views',0,'cards'],source={'dashboard':'','fingerprint':backend.fingerprint(from_config)}))
+        self.assertFalse(connection.errors);self.assertEqual(self.dashboard.config['views'][0]['cards'][0]['template'],'t')
+        self.dashboard.config['views'][0]['type']='panel';before=copy.deepcopy(self.dashboard.config)
+        blocked=Connection();await backend.dashboard_write(self.hass,blocked,self.write('append',path=['views',0,'cards'],source={'dashboard':'','fingerprint':backend.fingerprint(before)}));self.assertTrue(blocked.errors);self.assertEqual(self.dashboard.config,before)
+
+    async def test_popup_hash_uses_the_shared_hash_instead_of_the_stale_config_value(self):
+        self.state['templates']['t'] = {'name': 'Popup', 'config': {'type': 'custom:bubble-card', 'card_type': 'pop-up', 'hash': '#old', 'cards': []},
+                                        'bindings': [{'group': 'route', 'path': ['hash']}]}
+        self.state['groups']['route'] = {'name': 'Route', 'value': '#current'}
+        self.dashboard.config['views'][0]['cards'][0] = {'type': 'button', 'tap_action': {'action': 'navigate', 'navigation_path': '#current'}}
+        connection = Connection()
+        await backend.dashboard_write(self.hass, connection, self.write(path=['views', 0, 'cards', 0, 'tap_action'], value={'action': 'navigate', 'navigation_path': '#current'}))
+        self.assertFalse(connection.errors)
+        self.assertEqual(len(self.saved), 1)
+
+    async def test_explicit_popup_route_replaces_the_native_hash(self):
+        self.state['templates']['t'] = {'name': 'Popup', 'config': {'type': 'custom:bubble-card', 'card_type': 'pop-up', 'hash': '#native', 'cards': []},
+                                        'popup': {'hash': '#explicit'}}
+        button = {'type': 'button', 'tap_action': {'action': 'navigate', 'navigation_path': '#native'}}
+        connection = Connection()
+        await backend.dashboard_write(self.hass, connection, self.write('append', path=['views', 0, 'cards'], value=button,
+            source={'dashboard': '', 'fingerprint': backend.fingerprint(self.dashboard.config)}))
+        self.assertTrue(connection.errors)
+        self.assertFalse(self.saved)
+
+    async def test_popup_alias_inputs_are_validated_with_its_local_values(self):
+        self.state['templates']['t'] = {'name': 'Popup', 'config': {'type': 'markdown'}, 'popup': {'hash': '#base'},
+            'inputs': [{'path': ['entity'], 'label': 'Entity', 'type': 'entity', 'required': True}],
+            'popup_links': [{'hash': '#filled', 'overrides': [{'path': ['entity'], 'value': 'sensor.local'}]}]}
+        source = {'dashboard': '', 'fingerprint': backend.fingerprint(self.dashboard.config)}
+        invalid = Connection()
+        await backend.dashboard_write(self.hass, invalid, self.write('append', path=['views', 0, 'cards'],
+            value={'type': 'button', 'tap_action': {'action': 'navigate', 'navigation_path': '#base'}}, source=source))
+        self.assertTrue(invalid.errors)
+        self.assertFalse(self.saved)
+        valid = Connection()
+        await backend.dashboard_write(self.hass, valid, self.write('append', path=['views', 0, 'cards'],
+            value={'type': 'button', 'tap_action': {'action': 'navigate', 'navigation_path': '#filled'}}, source=source))
+        self.assertFalse(valid.errors)
+        self.assertEqual(len(self.saved), 1)
+
+    async def test_fire_dom_event_popup_rejects_nested_bubble_popups(self):
+        self.state['templates']['t']['config'] = {'type': 'horizontal-stack', 'cards': [
+            {'type': 'custom:bubble-card', 'card_type': 'pop-up', 'hash': '#nested', 'cards': []}]}
+        connection = Connection()
+        await backend.dashboard_write(self.hass, connection, self.write('append', path=['views', 0, 'cards'],
+            value={'type': 'button', 'tap_action': {'action': 'fire-dom-event', 'card_library': {'action': 'popup', 'template': 't'}}},
+            source={'dashboard': '', 'fingerprint': backend.fingerprint(self.dashboard.config)}))
+        self.assertTrue(connection.errors)
+        self.assertFalse(self.saved)
+
+    async def test_dashboard_snapshot_cannot_finish_after_the_integration_is_unloaded(self):
+        async def unloaded_load(force):
+            await backend.async_unload_entry(self.hass, None)
+            return self.dashboard.config
+        self.dashboard.async_load = unloaded_load
+        connection = Connection()
+        await backend.dashboard_get(self.hass, connection, {'id': 1, 'dashboard': ''})
+        self.assertTrue(connection.errors)
+        self.assertFalse(connection.results)

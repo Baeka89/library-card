@@ -3,6 +3,7 @@ from pathlib import Path
 from datetime import datetime
 import asyncio
 import logging
+import re
 
 from homeassistant.components import websocket_api
 from homeassistant.components.websocket_api import decorators as ws_decorators
@@ -16,6 +17,8 @@ from homeassistant.helpers.storage import Store as HAStore
 from homeassistant.core import callback
 
 from .model import commit, public_state, validate_library
+from .button_templates import convert_button_templates
+from .dashboard_edits import fingerprint, get_dashboard, patch_dashboard
 
 DOMAIN = "card_library"
 EVENT = "card_library_updated"
@@ -54,6 +57,31 @@ class CardLibraryStore(HAStore):
         self._library_written_data = data.get("data", data)
 
 
+def normalize_state(saved):
+    """Validate persisted cards/history in a worker without touching HA state."""
+    if saved is None:
+        return {"revision": 0, "templates": {}, "groups": {}, "people": {}, "history": []}
+    if not isinstance(saved, dict) or isinstance(saved.get("revision"), bool) or not isinstance(saved.get("revision"), int) or saved["revision"] < 0:
+        raise ValueError("Invalid stored revision")
+    library = validate_library({key: saved[key] for key in ("templates", "groups")} | {"people": saved.get("people", {})})
+    history = saved.get("history", [])
+    if not isinstance(history, list):
+        raise ValueError("Invalid stored history")
+    normalized_history = []
+    previous_revision = -1
+    for snapshot in history[-10:]:
+        if not isinstance(snapshot, dict) or not isinstance(snapshot.get("revision"), int) or isinstance(snapshot["revision"], bool) or not isinstance(snapshot.get("saved_at"), str):
+            raise ValueError("Invalid stored history item")
+        if not previous_revision < snapshot["revision"] < saved["revision"]:
+            raise ValueError("Stored history revisions must be unique, increasing and older than current state")
+        previous_revision = snapshot["revision"]
+        saved_at = datetime.fromisoformat(snapshot["saved_at"]).isoformat()
+        # Unchecked extra fields must not poison saves or websocket replies.
+        normalized_history.append({"revision": snapshot["revision"], "saved_at": saved_at,
+                                   "library": validate_library(snapshot["library"])})
+    return {**library, "revision": saved["revision"], "history": normalized_history}
+
+
 async def async_setup_entry(hass, entry):
     existing = hass.data.get(DOMAIN)
     if existing:
@@ -63,29 +91,7 @@ async def async_setup_entry(hass, entry):
     store = CardLibraryStore(hass, 1, DOMAIN, atomic_writes=True)
     saved = await store.async_load()
     try:
-        if saved is not None:
-            if not isinstance(saved, dict) or isinstance(saved.get("revision"), bool) or not isinstance(saved.get("revision"), int) or saved["revision"] < 0:
-                raise ValueError("Invalid stored revision")
-            library = validate_library({key: saved[key] for key in ("templates", "groups") } | {"people": saved.get("people", {})})
-            history = saved.get("history", [])
-            if not isinstance(history, list):
-                raise ValueError("Invalid stored history")
-            normalized_history = []
-            previous_revision = -1
-            for snapshot in history[-10:]:
-                if not isinstance(snapshot, dict) or not isinstance(snapshot.get("revision"), int) or isinstance(snapshot["revision"], bool) or not isinstance(snapshot.get("saved_at"), str):
-                    raise ValueError("Invalid stored history item")
-                if not previous_revision < snapshot["revision"] < saved["revision"]:
-                    raise ValueError("Stored history revisions must be unique, increasing and older than current state")
-                previous_revision = snapshot["revision"]
-                saved_at = datetime.fromisoformat(snapshot["saved_at"]).isoformat()
-                # Keep only the persisted snapshot schema. Unchecked extra
-                # fields must not poison future saves or websocket replies.
-                normalized_history.append({"revision": snapshot["revision"], "saved_at": saved_at,
-                                           "library": validate_library(snapshot["library"])})
-            state = {**library, "revision": saved["revision"], "history": normalized_history}
-        else:
-            state = {"revision": 0, "templates": {}, "groups": {}, "people": {}, "history": []}
+        state = await hass.async_add_executor_job(normalize_state, saved)
     except (ValueError, TypeError, KeyError, RecursionError) as error:
         _LOGGER.error("Card Library storage could not be validated: %s", error)
         return False
@@ -94,7 +100,7 @@ async def async_setup_entry(hass, entry):
         StaticPathConfig("/card_library", str(Path(__file__).parent / "frontend"), False)
     ])
     hass.data[DOMAIN] = {"store": store, "lock": asyncio.Lock(), "state": state, "active": True}
-    for command in (get_library, save_library, subscribe_library, get_history, restore_library, parse_card):
+    for command in (get_library, save_library, subscribe_library, get_history, restore_library, parse_card, parse_templates, dashboard_get, dashboard_write):
         websocket_api.async_register_command(hass, command)
     return True
 
@@ -160,7 +166,7 @@ async def save_library(hass, connection, msg):
             connection.send_error(msg["id"], "conflict", "Library changed. Reload before saving.")
             return
         try:
-            state = commit(data["state"], msg["library"])
+            state = await hass.async_add_executor_job(commit, data["state"], msg["library"])
         except (ValueError, TypeError, RecursionError) as error:
             connection.send_error(msg["id"], "invalid_library", str(error))
             return
@@ -214,7 +220,7 @@ async def restore_library(hass, connection, msg):
             connection.send_error(msg["id"], "not_found", "Version is no longer available.")
             return
         try:
-            state = commit(current, target["library"])
+            state = await hass.async_add_executor_job(commit, current, target["library"])
         except (ValueError, TypeError, KeyError, RecursionError) as error:
             connection.send_error(msg["id"], "invalid_library", str(error))
             return
@@ -226,6 +232,11 @@ def parse_card_yaml(source):
     if len(source.encode("utf-8")) > 2_000_000:
         raise ValueError("Karten-YAML überschreitet 2 MB")
     config = yaml.safe_load(source)
+    if isinstance(config, dict) and 'button_card_templates' in config:
+        templates = convert_button_templates(config)
+        if len(templates) != 1:
+            raise ValueError('Mehrere Button-Card-Vorlagen in der zentralen Bibliothek importieren')
+        return templates[0]['config']
     # HA header/footer YAML is a placement envelope rather than a card.
     if isinstance(config, dict) and "type" not in config and "card" in config:
         if set(config) - {"card", "max_width"}:
@@ -248,3 +259,79 @@ async def parse_card(hass, connection, msg):
         connection.send_error(msg["id"], "invalid_card_yaml", str(error))
         return
     connection.send_result(msg["id"], config)
+
+
+def parse_templates_yaml(source):
+    import yaml
+    if len(source.encode('utf-8')) > 2_000_000:
+        raise ValueError('Karten-YAML überschreitet 2 MB')
+    document = yaml.safe_load(source)
+    if isinstance(document, dict) and 'button_card_templates' in document:
+        return convert_button_templates(document)
+    return [{'name': 'Karte', 'config': parse_card_yaml(source), 'bindings': []}]
+
+
+@websocket_api.websocket_command({'type': 'card_library/parse_templates', vol.Required('yaml'): str})
+@websocket_api.async_response
+async def parse_templates(hass, connection, msg):
+    if active_data(hass, connection, msg) is None:
+        return
+    try:
+        import yaml
+        templates = await hass.async_add_executor_job(parse_templates_yaml, msg['yaml'])
+    except (ValueError, TypeError, RecursionError, yaml.YAMLError) as error:
+        connection.send_error(msg['id'], 'invalid_card_yaml', str(error))
+        return
+    connection.send_result(msg['id'], templates)
+
+
+@websocket_api.websocket_command({'type':'card_library/dashboard_get', vol.Required('dashboard'): str})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def dashboard_get(hass, connection, msg):
+    data = active_data(hass,connection,msg)
+    if data is None: return
+    try:
+        dashboard = get_dashboard(hass,msg['dashboard'])
+        config = await dashboard.async_load(dashboard.mode=='yaml')
+        if not data.get('active', True):
+            connection.send_error(msg['id'], 'not_available', 'Integration was unloaded.')
+            return
+        result = {'config':config,'fingerprint':fingerprint(config),'mode':dashboard.mode,'library_revision':data['state']['revision']}
+    except Exception as error:
+        connection.send_error(msg['id'],'dashboard_error',str(error)); return
+    connection.send_result(msg['id'],result)
+
+
+@websocket_api.websocket_command({'type':'card_library/dashboard_write', vol.Required('dashboard'):str,
+    vol.Required('fingerprint'):str, vol.Required('path'):list, vol.Required('value'):dict,
+    vol.Required('operation'):str, vol.Required('library_revision'):validate_revision, vol.Required('source'):dict})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def dashboard_write(hass,connection,msg):
+    data = active_data(hass,connection,msg)
+    if data is None: return
+    lock = data.setdefault('dashboard_locks',{}).setdefault(msg['dashboard'],asyncio.Lock())
+    async with lock, data['lock']:
+        try:
+            if not re.fullmatch('[0-9a-f]{64}',msg['fingerprint']): raise ValueError('Invalid dashboard fingerprint')
+            dashboard = get_dashboard(hass,msg['dashboard'])
+            if dashboard.mode != 'storage': raise ValueError('YAML/generated dashboards cannot be saved here; use the exported configuration')
+            config = await dashboard.async_load(False)
+            if not data.get('active',True): raise ValueError('Integration was unloaded')
+            if msg['library_revision'] != data['state']['revision']: raise ValueError('Library changed; reload before saving')
+            if fingerprint(config) != msg['fingerprint']: raise ValueError('Dashboard changed; reload before saving')
+            if msg['operation'] == 'append':
+                source = msg['source']
+                if not isinstance(source.get('dashboard'),str) or not isinstance(source.get('fingerprint'),str): raise ValueError('Duplicate source is missing')
+                origin = get_dashboard(hass,source['dashboard'])
+                origin_config = await origin.async_load(origin.mode=='yaml')
+                if fingerprint(origin_config) != source['fingerprint']: raise ValueError('Duplicate source changed; reload')
+                config = await dashboard.async_load(False)
+                if fingerprint(config) != msg['fingerprint'] or not data.get('active',True) or msg['library_revision'] != data['state']['revision']:
+                    raise ValueError('Dashboard/library changed; reload')
+            candidate = patch_dashboard(config,msg['path'],msg['value'],msg['operation'],data['state'])
+            await dashboard.async_save(candidate)
+        except Exception as error:
+            connection.send_error(msg['id'],'dashboard_conflict',str(error)); return
+        connection.send_result(msg['id'],{'fingerprint':fingerprint(candidate),'config':candidate,'mode':'storage'})

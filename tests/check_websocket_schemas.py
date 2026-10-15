@@ -27,7 +27,7 @@ for validator in (voluptuous, probatio):
                 'voluptuous': voluptuous, 'probatio': probatio}
     with patch.dict(sys.modules, bindings): spec.loader.exec_module(backend)
     assert backend.vol is validator
-    handlers = [backend.get_library, backend.save_library, backend.subscribe_library, backend.get_history, backend.restore_library, backend.parse_card]
+    handlers = [backend.get_library, backend.save_library, backend.subscribe_library, backend.get_history, backend.restore_library, backend.parse_card, backend.parse_templates, backend.dashboard_get, backend.dashboard_write]
     payloads = [
         {'id': 1, 'type': 'card_library/get'},
         {'id': 2, 'type': 'card_library/save', 'revision': 0, 'library': {}},
@@ -35,6 +35,9 @@ for validator in (voluptuous, probatio):
         {'id': 4, 'type': 'card_library/history'},
         {'id': 5, 'type': 'card_library/restore', 'revision': 1, 'target_revision': 0},
         {'id': 6, 'type': 'card_library/parse_card', 'yaml': 'type: markdown'},
+        {'id': 7, 'type': 'card_library/parse_templates', 'yaml': 'button_card_templates: {}'},
+        {'id':8,'type':'card_library/dashboard_get','dashboard':''},
+        {'id':9,'type':'card_library/dashboard_write','dashboard':'','fingerprint':'a'*64,'path':['views',0,'cards',0],'value':{},'operation':'replace','library_revision':0,'source':{}},
     ]
     for handler, payload in zip(handlers, payloads):
         assert handler.schema(payload) == payload
@@ -51,4 +54,4 @@ for validator in (voluptuous, probatio):
     try: backend.save_library.schema({**payloads[1], 'library': []})
     except validator.Invalid: pass
     else: raise AssertionError('Invalid library accepted')
-    print(f'PASS: all six websocket command schemas validated with {validator.__name__}, including malformed requests')
+    print(f'PASS: all nine websocket command schemas validated with {validator.__name__}, including malformed requests')

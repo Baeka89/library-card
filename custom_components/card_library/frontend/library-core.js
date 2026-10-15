@@ -112,6 +112,30 @@ export function validateCard(config) {
   }
   walk(config);
 }
+export function validateInputDefinitions(template) {
+  if (typeof (template.category === undefined ? '' : template.category) !== 'string' || [...(template.category === undefined ? '' : template.category)].length > 100 || typeof (template.protected === undefined ? false : template.protected) !== 'boolean') throw Error('Ungültige Kategorie oder Vorlagenschutz');
+  const fields = template.inputs === undefined ? [] : template.inputs, paths = [];
+  if (!Array.isArray(fields) || fields.length > 100) throw Error('Ungültige Eingabefelder');
+  for (const input of fields) {
+    if (!input || Array.isArray(input) || typeof input !== 'object' || Object.keys(input).some(key=>!['path','label','type','required','options','domains'].includes(key))) throw Error('Ungültiges Eingabefeld');
+    validatePath(input.path); if(input.path[0]==='type')throw Error('Kartentyp kann kein Eingabefeld sein');
+    if (!hasText(input.label) || [...input.label].length > 200 || !['entity','text','number','boolean','select'].includes(input.type) || typeof (input.required === undefined ? false : input.required) !== 'boolean') throw Error('Ungültiger Eingabefeldtyp');
+    if (paths.some(path=>overlap(path,input.path)) || template.bindings?.some(binding=>overlap(binding.path,input.path))) throw Error('Eingabefeld überlappt ein anderes Feld oder eine zentrale Bindung');
+    if (input.options !== undefined && (input.type !== 'select' || !Array.isArray(input.options) || !input.options.length || input.options.some(value=>!hasText(value)) || new Set(input.options).size!==input.options.length) || input.type==='select' && !input.options?.length) throw Error('Ungültige Auswahlliste');
+    if (input.domains !== undefined && (input.type !== 'entity' || !Array.isArray(input.domains) || input.domains.some(domain=>typeof domain!=='string'|| !/^[a-z_]+$/.test(domain)))) throw Error('Ungültige Entitätsdomänen');
+    paths.push(input.path);
+  }
+}
+export function inputErrors(template, config) {
+  const errors = [];
+  for (const input of template.inputs || []) {
+    const value = getAt(config,input.path), empty = value == null || typeof value === 'string' && !value.trim();
+    if (empty) { if (input.required) errors.push('Pflichtfeld fehlt: '+input.label); continue; }
+    const valid = input.type==='text' && typeof value==='string' || input.type==='number' && typeof value==='number' && Number.isFinite(value) || input.type==='boolean' && typeof value==='boolean' || input.type==='select' && typeof value==='string' && input.options.includes(value) || input.type==='entity' && typeof value==='string' && /^[a-z_]+\.[a-z0-9_]+$/.test(value) && (!input.domains?.length || input.domains.includes(value.split('.')[0]));
+    if (!valid) errors.push('Ungültiger Wert: '+input.label);
+  }
+  return errors;
+}
 export function resolveTemplate(library, id, overrides = []) {
   const template = Object.hasOwn(library.templates, id) ? library.templates[id] : null;
   if (!template) throw Error('Vorlage fehlt: ' + id);
@@ -357,7 +381,7 @@ export function walkCards(config) {
 export function dependencies(config, explicit = []) {
   const types = new Set(), entities = new Set();
   function walk(node, key = '') {
-    if (typeof node === 'string' && (key === 'entity' || key === 'entity_id' || key === 'calendar' || key === 'calendars' || key === 'entities') && /^[a-z_]+\.[a-z0-9_]+$/i.test(node)) entities.add(node);
+    if (typeof node === 'string' && (key === 'entity' || key.startsWith('entity_') || key === 'entity_id' || key === 'calendar' || key === 'calendars' || key === 'entities') && /^[a-z_]+\.[a-z0-9_]+$/i.test(node)) entities.add(node);
     if (!node || typeof node !== 'object') return;
     if (typeof node.type === 'string' && node.type.startsWith('custom:')) types.add(node.type.slice(7));
     for (const [k, v] of Object.entries(node)) walk(v, Array.isArray(node) ? key : k);
@@ -478,6 +502,7 @@ export function importLibrary(input) {
       paths.push(binding.path);
     }
   }
+  for (const template of Object.values(library.templates)) validateInputDefinitions(template);
   for (const id of Object.keys(library.templates)) validateDesignPaths({...library.templates[id], config: resolveTemplate(library, id)});
   validatePopupRoutes(library);
   return library;

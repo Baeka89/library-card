@@ -251,3 +251,19 @@ test('a manual popup factory cannot publish stale inherited central options', as
     win.__cardLibraryPopupController.close(); await flush();
   } finally {helpers.createCardElement = original;}
 });
+
+test('resource updates revalidate required fields of visible standalone hash popups', async () => {
+  const state = library({type:'custom:bubble-card',card_type:'pop-up',hash:'#required',cards:[{type:'markdown',content:'Central'}]});
+  const push = connect(state), notifications = [];
+  const notify = event=>notifications.push(event.detail.message); app.addEventListener('hass-notification',notify);
+  try {
+    win.location.hash = '#required'; win.dispatchEvent(new Event('location-changed')); await flush();
+    const previous = created.filter(card=>card.localName==='bubble-card').at(-1); assert.equal(previous.isConnected,true);
+    const next = structuredClone(state); next.revision++; next.templates.calendar.inputs = [{path:['cards',0,'title'],label:'Titel',type:'text',required:true}];
+    push(next); await flush();
+    assert.equal(previous.isConnected,false); assert.equal(win.location.hash,'#required'); assert.equal(notifications.length,1); assert.match(notifications[0],/Titel/);
+    const corrected = structuredClone(next); corrected.revision++; corrected.templates.calendar.config.cards[0].title = 'Nachgereicht'; push(corrected); await flush();
+    const reopened = created.filter(card=>card.localName==='bubble-card').at(-1);
+    assert.notEqual(reopened,previous); assert.equal(reopened.isConnected,true); assert.equal(reopened.config.cards[0].title,'Nachgereicht');
+  } finally {app.removeEventListener('hass-notification',notify);win.__cardLibraryPopupController.close();await flush();}
+});

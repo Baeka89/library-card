@@ -58,3 +58,18 @@ test('native confirmation rejects actions when library changes while the dialog 
     const cancelled=confirmAction(owner,'Delete?');host.children.at(-1).dispatchEvent({type:'closed'});assert.equal(await cancelled,false);
   } finally {document.querySelector=previousQuery;document.body=previousBody;}
 });
+
+
+test('expanded child disclosures defer expensive work until closed ancestors open',async()=>{
+  const host=el('div'),parent=el('details',undefined,host);el('summary','Parent',parent);const child=el('details',undefined,parent);el('summary','Child',child);child.open=true;let loads=0;
+  whenOpen(child,()=>loads++,true);assert.equal(loads,0);
+  parent.open=true;parent.dispatchEvent({type:'toggle'});await Promise.resolve();assert.equal(loads,1);
+  parent.open=false;parent.dispatchEvent({type:'toggle'});parent.open=true;parent.dispatchEvent({type:'toggle'});await Promise.resolve();assert.equal(loads,2);
+});
+test('refreshing older native dropdown choices replaces options rather than appending duplicates',()=>{
+  const select=field(new HTMLElement('div'),'Choice','select');delete select.options;
+  setSelectOptions(select,[['a','A'],['b','B']]);setSelectOptions(select,[['c','C']]);assert.equal(select.children.length,1);assert.equal(select.children[0].value,'c');
+});
+test('owned hidden controls override layout display rules without touching original card editors',async()=>{
+  const {css}=await import('../custom_components/card_library/frontend/library-ui.js');assert.match(css,/\[data-library-ui\]\[hidden\]\{display:none!important\}/);
+});

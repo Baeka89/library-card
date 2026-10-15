@@ -91,6 +91,11 @@ def set_at(value, path, new_value, *, copy_value=True):
         if i == len(path) - 1:
             cursor[key] = copy.deepcopy(new_value) if copy_value else new_value
         else:
+            if isinstance(cursor[key], (dict, list)):
+                # YAML aliases can share a descendant between unrelated paths.
+                # Detach this branch before writing through it so a binding or
+                # dashboard edit affects only the selected occurrence.
+                cursor[key] = cursor[key].copy()
             cursor = cursor[key]
 
 
@@ -138,14 +143,14 @@ def paths_overlap(first, second):
     return first[:len(second)] == second or second[:len(first)] == first
 
 
-def get_at(value, path):
+def get_at(value, path, default=None):
     for key in path:
         if isinstance(value, dict) and isinstance(key, str) and key in value:
             value = value[key]
-        elif isinstance(value, list) and isinstance(key, int) and not isinstance(key, bool) and key < len(value):
+        elif isinstance(value, list) and isinstance(key, int) and not isinstance(key, bool) and 0 <= key < len(value):
             value = value[key]
         else:
-            return None
+            return default
     return value
 
 
@@ -227,6 +232,73 @@ def validate_popup_content(config):
                 visit(child, [*path, index])
 
     visit(config, [])
+
+
+def validate_inputs(item):
+    category = item.get('category', '')
+    if not isinstance(category, str) or len(category) > 100:
+        raise ValueError('Invalid template category')
+    if not isinstance(item.get('protected', False), bool):
+        raise ValueError('Invalid template protection')
+    inputs = item.get('inputs', [])
+    if not isinstance(inputs, list) or len(inputs) > 100:
+        raise ValueError('Invalid input definitions')
+    paths = []
+    for field in inputs:
+        if not isinstance(field, dict) or set(field) - {'path','label','type','required','options','domains'}:
+            raise ValueError('Invalid input definition')
+        path = field.get('path'); validate_path(path)
+        if not has_text(field.get('label')) or len(field['label']) > 200 or field.get('type') not in ('entity','text','number','boolean','select'):
+            raise ValueError('Invalid input label/type')
+        if not isinstance(field.get('required', False), bool):
+            raise ValueError('Invalid required flag')
+        if any(paths_overlap(path, previous) for previous in paths):
+            raise ValueError('Overlapping input definitions')
+        if any(paths_overlap(path, binding['path']) for binding in item.get('bindings', [])):
+            raise ValueError('Input field is managed centrally')
+        if 'options' in field and (field['type'] != 'select' or not isinstance(field['options'], list) or not field['options'] or any(not has_text(option) for option in field['options']) or len(set(field['options'])) != len(field['options'])):
+            raise ValueError('Invalid input options')
+        if field['type'] == 'select' and not field.get('options'):
+            raise ValueError('Select input needs options')
+        if 'domains' in field and (field['type'] != 'entity' or not isinstance(field['domains'], list) or any(not isinstance(domain, str) or not re.fullmatch(r'[a-z_]+',domain) for domain in field['domains'])):
+            raise ValueError('Invalid input domains')
+        paths.append(path)
+
+
+def validate_input_values(template, config):
+    for field in template.get('inputs', []):
+        value = get_at(config, field['path'])
+        empty = value is None or isinstance(value,str) and not has_text(value)
+        if empty and field.get('required'):
+            raise ValueError('Required input missing: ' + field['label'])
+        if empty:
+            continue
+        kind = field['type']
+        valid = (kind == 'text' and isinstance(value,str) or
+                 kind == 'number' and not isinstance(value,bool) and isinstance(value,(int,float)) and math.isfinite(value) or
+                 kind == 'boolean' and isinstance(value,bool) or
+                 kind == 'select' and isinstance(value,str) and value in field['options'] or
+                 kind == 'entity' and isinstance(value,str) and re.fullmatch(r'[a-z_]+\.[a-z0-9_]+',value) and (not field.get('domains') or value.split('.')[0] in field['domains']))
+        if not valid:
+            raise ValueError('Invalid input value: ' + field['label'])
+
+
+def validate_protection(current, candidate):
+    for identifier, template in current.get('templates', {}).items():
+        if not template.get('protected'):
+            continue
+        replacement = candidate['templates'].get(identifier)
+        if replacement is None:
+            raise ValueError('Protected template cannot be deleted')
+        old = {key:value for key,value in template.items() if key != 'popup_links'}
+        new = {key:value for key,value in replacement.items() if key != 'popup_links'}
+        if new == old:
+            continue
+        if new == {**old,'protected':False} and replacement.get('popup_links') == template.get('popup_links'):
+            unlocked = library_only(current); unlocked['templates'][identifier]['protected'] = False
+            if library_only(candidate) == unlocked:
+                continue
+        raise ValueError('Unlock the protected template in a separate save before editing')
 
 
 def validate_library(value):
@@ -334,6 +406,7 @@ def validate_library(value):
             if any(path[:len(other)] == other or other[:len(path)] == path for other in selected):
                 raise ValueError("Overlapping design paths")
             selected.append(path)
+        validate_inputs(item)
         dependencies = item.get("dependencies", [])
         if not isinstance(dependencies, list) or any(not isinstance(d, str) or not d.startswith(("https://", "http://", "/")) for d in dependencies):
             raise ValueError("Dependencies must be resource URLs")
@@ -342,6 +415,7 @@ def validate_library(value):
 
 def commit(current, library):
     validated = validate_library(library)
+    validate_protection(current, validated)
     snapshot = {"revision": current["revision"], "saved_at": datetime.now(timezone.utc).isoformat(),
                 "library": library_only(current)}
     history = [*current.get("history", []), snapshot][-10:]

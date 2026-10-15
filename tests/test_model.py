@@ -167,6 +167,16 @@ class ResolvedDepthTest(unittest.TestCase):
 
 
 class SharedYamlStructureTest(unittest.TestCase):
+    def test_binding_write_changes_only_the_selected_yaml_alias_path(self):
+        for copy_value in (True, False):
+            with self.subTest(copy_value=copy_value):
+                shared = {'style': {'color': 'original'}}
+                config = {'first': shared, 'second': shared}
+                model.set_at(config, ['first', 'style', 'color'], 'central', copy_value=copy_value)
+                self.assertEqual(config['first']['style']['color'], 'central')
+                self.assertEqual(config['second']['style']['color'], 'original')
+                self.assertEqual(shared['style']['color'], 'original')
+
     def test_reused_subtree_is_validated_once(self):
         class CountingList(list):
             visits = 0
@@ -540,3 +550,41 @@ class PopupLinksValidationTest(unittest.TestCase):
         self.assertEqual(restored['revision'], 3)
         self.assertEqual(restored['templates']['calendar'], data['templates']['calendar'])
 
+
+class TemplateWorkflowValidationTest(unittest.TestCase):
+    def state(self):
+        return {'revision':0,'templates':{'t':{'name':'Protected','protected':True,'config':{'type':'markdown','content':'original'}}},'groups':{},'people':{}}
+    def test_protection_blocks_edit_delete_and_unlock_with_changes(self):
+        import copy
+        state=self.state()
+        for operation in ['edit','delete','unlock_and_edit']:
+            candidate=model.library_only(state)
+            if operation=='delete':candidate['templates'].clear()
+            else:
+                candidate['templates']['t']['config']['content']='changed'
+                if operation=='unlock_and_edit':candidate['templates']['t']['protected']=False
+            with self.subTest(operation=operation),self.assertRaises(ValueError):model.commit(state,candidate)
+        self.assertEqual(state['templates']['t']['config']['content'],'original')
+    def test_unlock_requires_separate_commit_then_allows_editing(self):
+        state=self.state();candidate=model.library_only(state);candidate['templates']['t']['protected']=False
+        unlocked=model.commit(state,candidate);candidate=model.library_only(unlocked);candidate['templates']['t']['config']['content']='changed'
+        self.assertEqual(model.commit(unlocked,candidate)['templates']['t']['config']['content'],'changed')
+    def test_protection_allows_independent_hash_exceptions(self):
+        state=self.state();candidate=model.library_only(state);candidate['templates']['t']['popup_links']=[{'hash':'#local','overrides':[{'path':['content'],'value':'local'}]}]
+        result=model.commit(state,candidate);self.assertTrue(result['templates']['t']['protected']);self.assertEqual(result['templates']['t']['config']['content'],'original')
+    def test_input_schema_and_values(self):
+        state=self.state();template=state['templates']['t'];template['inputs']=[{'path':['entity'],'label':'E','type':'entity','required':True,'domains':['cover']}]
+        model.validate_library(model.library_only(state))
+        for config in [{},{'entity':' '},{'entity':'light.x'}]:
+            with self.assertRaises(ValueError):model.validate_input_values(template,config)
+        model.validate_input_values(template,{'entity':'cover.x'})
+    def test_metadata_rejects_nulls_and_overlapping_paths(self):
+        for fields in [{'protected':None},{'category':None},{'inputs':None},{'inputs':[{'path':['type'],'label':'Bad','type':'text'}]},{'inputs':[{'path':['entity'],'label':'A','type':'text'},{'path':['entity'],'label':'B','type':'text'}]}]:
+            candidate=model.library_only(self.state());candidate['templates']['t'].update(fields)
+            with self.subTest(fields=fields),self.assertRaises(ValueError):model.validate_library(candidate)
+
+class ProtectedImportTest(unittest.TestCase):
+    def test_import_cannot_unlock_a_template_while_changing_unrelated_data(self):
+        state={'revision':0,'templates':{'t':{'name':'T','protected':True,'config':{'type':'markdown'}}},'groups':{},'people':{}}
+        candidate=model.library_only(state);candidate['templates']['t']['protected']=False;candidate['groups']['g']={'name':'New','value':1}
+        with self.assertRaises(ValueError):model.commit(state,candidate)

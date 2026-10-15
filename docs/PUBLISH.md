@@ -1,106 +1,68 @@
-# v0.5.1 veröffentlichen und bei HACS einreichen
+# Library Card v0.5.2 veröffentlichen
 
-Das vollständige Quellpaket entpacken. `publish.py` benötigt die anderen
-Projektdateien und ist kein eigenständiger Installer ohne Quellcode.
-Der gewählte Zielordner wird automatisch angelegt. Er muss leer sein oder aus
-einem vorherigen Start dieses Skripts stammen; fremde Projekte werden nicht überschrieben.
+Das einzelne Skript `publish_library_card_v0_5_2.py` enthält alle geprüften Quellen,
+das Logo und die Dokumentation. Es wird außerhalb des Projektordners heruntergeladen.
+Das bisher veröffentlichte v0.5.1 wird erhalten; alle freigegebenen lokalen Änderungen
+werden gemeinsam als v0.5.2 veröffentlicht. Die früher vorbereiteten Zwischenstände
+waren keine öffentlichen Releases und bleiben im getrennten Archivverzeichnis.
 
-## Einmalige Voraussetzungen
+## Ausführen auf dem Ubuntu-PC
 
-- Python 3.12 oder neuer: https://www.python.org/downloads/
-- Git: https://git-scm.com/downloads
-- Node.js 22: https://nodejs.org/
-- GitHub CLI: https://cli.github.com/
-- Eigenes persönliches GitHub-Konto mit Berechtigung für Repository-Erstellung,
-  Workflow-Dateien, Actions-Lesen sowie Fork/PR-Erstellung.
-- HACS-Richtlinien lesen: https://www.hacs.xyz/docs/publish/start/ und
-  https://www.hacs.xyz/docs/publish/include/.
-
-Im Terminal in den entpackten Quellordner wechseln. Dann anmelden:
+Voraussetzungen: Python 3.12+, Git, Node.js 22+ und mit Baeka89 angemeldete GitHub CLI.
 
 ```bash
-gh auth login --hostname github.com --scopes workflow
+python3 /home/ubuntu/Downloads/publish_library_card_v0_5_2.py
 ```
 
-Die Anmeldung öffnet GitHubs eigenen Ablauf. Keine Zugangstokens in Dateien
-eintragen. Das Skript liest den Benutzernamen danach über `gh api user`.
-Die MIT-Lizenz ist bereits gewählt und enthalten.
+Projekt: `/home/ubuntu/Projekte/Projekt Library-Card`. Falls das Projekt noch
+`library-card` heißt, erkennt das Skript diesen bisherigen Pfad und benennt den
+Ordner um. Das getrennte Archivverzeichnis wird nicht verlegt oder überschrieben.
 
-## Alles automatisch ausführen
-
-Den Projektpfad an deinen PC anpassen. Windows-Beispiel:
-
-```powershell
-python publish.py --project-dir "C:\Users\DEINNAME\Projekte\library-card" --publish --submit-hacs --ack-publishing-docs
-```
-
-Linux/macOS-Beispiel:
+Abweichenden Projektpfad angeben:
 
 ```bash
-python publish.py --project-dir "$HOME/Projekte/library-card" --publish --submit-hacs --ack-publishing-docs
+python3 /home/ubuntu/Downloads/publish_library_card_v0_5_2.py --project-dir "/DEIN/PFAD/Projekt Library-Card"
 ```
 
-Falls Windows `python` nicht findet, `py -3.12` verwenden. Mit
-`--ack-publishing-docs` bestätigst du die erste Angabe der offiziellen HACS-Checkliste,
-dass du die Veröffentlichungsrichtlinien gelesen hast. Das Flag deaktiviert keine Prüfung.
-
-Der Ablauf:
-
-1. Quellcode in den lokalen Projekteordner übernehmen.
-2. GitHub-Links, Codeowner und CODEOWNERS auf dein Konto setzen.
-3. Testabhängigkeiten in einer lokalen `.venv` installieren und alle Tests prüfen.
-4. Öffentliches Repository `<dein Benutzer>/library-card` anlegen, Beschreibung,
-   Topics und Issues einrichten. Den lokalen `main`-Branch ohne Force-Push hochladen.
-5. **HACS**, **Hassfest** und **Tests** für genau diesen Commit abwarten.
-   Fehler, übersprungene Jobs oder ein Zeitlimit stoppen den Ablauf.
-6. Den Tag `v0.5.1` und ein vollständiges stabiles GitHub-Release erstellen.
-   Integrations-ZIP und SHA256-Prüfsumme werden beigefügt und geprüft.
-7. `hacs/default` in dein persönliches Konto forken. Einen eigenen Branch von
-   `upstream/master` erstellen und nur deinen alphabetischen Eintrag in `integration` ergänzen.
-8. Den aktuellen HACS-Antrag mit Release-/Prüflauf-Links ausfüllen und als
-   editierbaren Pull Request öffnen. Geänderte unbekannte Checklisten stoppen die Einreichung.
-
-Das Ergebnis steht im Projektordner unter `.publication/result.json`.
-Der ausgefüllte Antrag steht in `.publication/HACS-APPLICATION.md`.
-Diese lokalen Dateien und die Testumgebung werden nicht ins Repository hochgeladen.
-
-## Varianten und Wiederholung
-
-Nur den Ablauf anzeigen, ohne Änderungen oder Anmeldung:
+Nur Paket, Anmeldung, Projektstand und Remote-Voraussetzungen prüfen (ohne lokale
+Änderungen, Commits, Uploads oder Release):
 
 ```bash
-python publish.py --dry-run
+python3 /home/ubuntu/Downloads/publish_library_card_v0_5_2.py --check-only
 ```
 
-Nur lokal vorbereiten und prüfen, ohne GitHub-Anmeldung oder Upload:
+## Ablauf
 
-```bash
-python publish.py --owner DEIN_GITHUB_BENUTZER --project-dir "DEIN_PROJEKTEORDNER/library-card"
-```
+1. Eingebettete Quellen/Prüfsumme, Versionen, Werkzeuge, GitHub-Konto und beide
+   Remote-Adressen prüfen. Aktuellen main-Stand und vorhandene Ziel-Tags/Release prüfen.
+2. Nur bekannte Ausgangsstände oder ein nachweislich zu diesem Skript gehörendes
+   vorbereitetes Update übernehmen. Fremde lokale Änderungen stoppen den Ablauf.
+3. Quellen, Version, README, Changelog und Icons übernehmen. Testabhängigkeiten in
+   einer isolierten `.venv` installieren, alle Funktionstests und WebSocket-Schemas
+   prüfen und das reproduzierbare Installationsarchiv erstellen.
+4. Commit ohne Force-Push hochladen. HACS, Hassfest und Tests für genau diesen
+   Commit vollständig erfolgreich abwarten.
+5. Passenden Release-Tag erstellen/wiederverwenden. Release zunächst als Entwurf
+   anlegen, Dateien hochladen und anhand ihrer tatsächlichen Prüfsummen kontrollieren.
+6. Erst nach vollständiger erfolgreicher Prüfung als stabiles v0.5.2 veröffentlichen.
+   Bestehende passende Releases werden wiederverwendet; nur fehlende Assets ergänzt.
+7. Den bestehenden HACS-Antrag #11851 anzeigen. Es wird kein zweiter Antrag erstellt.
 
-Nur veröffentlichen, noch keinen HACS-Antrag senden:
+Nach Abbruch denselben Befehl erneut ausführen. Passende vorbereitete Dateien,
+Commits, Tags und Release-Dateien werden geprüft und wiederverwendet; abweichende
+Daten werden nicht überschrieben. Ein fehlerhafter Workflow verhindert das Release.
 
-```bash
-python publish.py --project-dir "DEIN_PROJEKTEORDNER/library-card" --publish
-```
+Fehlt auf Ubuntu `ensurepip`, das zur verwendeten Python-Version passende
+`python3-venv`-Paket installieren und das Skript erneut starten. Eine unvollständige
+vom Skript verwendete `.venv` wird ohne Löschen ihrer Daten erneut eingerichtet.
 
-Nach einem Verbindungsfehler denselben Befehl erneut starten. Vorhandene lokale
-Änderungen bleiben erhalten. Ein passendes stabiles Release oder offener Antrag
-wird wiederverwendet. Fremde Repository-Inhalte, abweichende Tags und unbekannte
-Branchänderungen werden nicht überschrieben. Ein geschlossener HACS-Antrag wird
-nicht automatisch erneut eröffnet: zuerst den genannten Ablehnungsgrund beheben.
+## Home Assistant aktualisieren
 
-Das Skript erstellt ein Release nur für diese erste öffentliche Version.
-Spätere Veröffentlichungen benötigen eine neue konsistente Versionsnummer.
-Wurde ein Prüflauf nach dem Release erneut ausgeführt, prüft das Skript weiterhin
-die HACS-Regel zur zeitlichen Reihenfolge; es löscht kein bestehendes Release.
+Nach erfolgreicher Veröffentlichung über HACS aktualisieren, HA neu starten,
+Ressource auf `/card_library/card-library.js?v=0.5.2` setzen und Browser neu laden.
+Das Skript hat keinen Zugriff auf deine HA-Instanz und führt diesen letzten Schritt
+nicht selbst aus. Logo-Anzeige lokal ab HA 2026.3; Store-Anzeige vor Installation
+hängt vom verwendeten Index und dessen Cache ab.
 
-## Was nicht automatisch zugesichert werden kann
-
-HACS entscheidet über Aufnahme und Zeitpunkt. Ein erfolgreich eingereichter PR
-bedeutet noch keine Standardaufnahme. Bis dahin kann das öffentliche Repository
-als benutzerdefinierte **Integration** in HACS verwendet werden.
-
-Die vollständigen Remote-Prüfungen können erst nach der Repository-Erstellung
-laufen. Lokale Tests und Hassfest ersetzen weder diesen HACS-Lauf noch Tests mit
-deiner tatsächlichen HA-/Bubble-Version. Status: [HACS-Prüfbericht](HACS-AUDIT.md).
+HACS-Aufnahme und Prüfdauer entscheidet das HACS-Team. Das bestehende Verfahren
+bleibt erhalten: https://github.com/hacs/default/pull/11851.

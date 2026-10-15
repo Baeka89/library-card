@@ -1,5 +1,7 @@
 # Library Card for Home Assistant
 
+<p align="center"><img src="custom_components/card_library/brand/icon@2x.png" alt="Library Card" width="160" height="160"></p>
+
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Baeka89&repository=library-card&category=integration)
 [![Maintainer](https://img.shields.io/badge/Maintainer-Baeka89-blue.svg)](https://github.com/Baeka89)
 [![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://paypal.me/misomazo)
@@ -19,7 +21,7 @@
 
 Beispiel: Kalender auf dem Dashboard und im Bildschirmschoner zeigen unterschiedliche Informationen, verwenden aber dieselben zentral gepflegten Personenfarben.
 
-Die Integration benötigt Home Assistant **2024.7.0** oder neuer. Einrichtung und Bibliotheksoberfläche unterstützen Deutsch und Englisch. Fremde Karten behalten ihre eigenen Übersetzungen und Editoren.
+Die Integration benötigt Home Assistant **2024.7.0** oder neuer. Das mitgelieferte Logo wird von Home Assistant ab **2026.3** lokal unterstützt; ältere Versionen zeigen gegebenenfalls ein Standardsymbol. Einrichtung und Bibliotheksoberfläche unterstützen Deutsch und Englisch. Fremde Karten behalten ihre eigenen Übersetzungen und Editoren.
 
 ### Unterstützte Karten
 
@@ -36,11 +38,15 @@ Custom Cards müssen separat installiert und als Ressourcen geladen sein. Eine v
 * **Zentrale Vorlagen:** fertige Karten speichern, später bearbeiten, duplizieren und löschen. Zentrale Änderungen erreichen alle Verknüpfungen.
 * **Native HA-Oberfläche:** Menüs, Buttons und Felder folgen dem Home-Assistant-Theme; Originaleditoren behalten ihre eigene Oberfläche.
 * **Originale Karteneditoren:** den vorhandenen grafischen Editor der jeweiligen Karte nutzen; alternativ vollständige Karten-YAML direkt einfügen.
+* **Button-Card-Templates:** `button_card_templates` importieren und Entitäten/Variablen erst beim Einsetzen festlegen.
 * **Flexible Übernahme:** alles, nur markierte Designfelder oder ausgewählte Felder übernehmen; Entitäten je Verwendung anpassen.
 * **Gemeinsame Einstellungen:** beispielsweise Personenfarben zentral verwalten und mit mehreren Vorlagen verbinden.
 * **Örtliche Ausnahmen:** Entitäten, Gestaltung, `card_mod` und kartenspezifische Styles je Verknüpfung ändern.
 * **Popups ohne zusätzliche Dashboard-Karte:** ein Button öffnet die Bibliotheksvorlage über `#Hash`.
 * **Mehrere Popup-Verknüpfungen:** verschiedene Hashes mit eigenen örtlichen Einstellungen für dieselbe Vorlage speichern.
+* **Vorlagen organisieren:** definierte Eingabefelder, Kategorien/Suche, Vorlagenschutz, gezielte Rücknahme und Änderungsvorschau.
+* **Lokale Verwendungen:** ansehen/bearbeiten, vergleichen und mit lokalen Ausnahmen duplizieren; fehlende Entitäten und Ausnahmen erkennen.
+* **Nutzungsübersicht:** Fundstellen je Vorlage sehen und Dashboard-Ansichten oder erkannte Popups direkt öffnen.
 * **Bibliotheksverwaltung:** JSON-Import/Export, Verlauf, Wiederherstellung und Prüfung bekannter Dashboard-Verwendungen.
 
 ### Zwei getrennte Arbeitsbereiche
@@ -85,11 +91,15 @@ Custom cards must be installed separately and loaded as resources. Compatibility
 * **Central templates:** save, edit, duplicate and delete cards. Central changes reach all linked uses.
 * **Native HA interface:** menus, buttons and fields follow the Home Assistant theme; original editors keep their own interface.
 * **Original card editors:** use the card's existing graphical editor or paste complete card YAML directly.
+* **Button Card templates:** import `button_card_templates` and set entities/variables when inserting a linked card.
 * **Flexible inheritance:** inherit everything, marked design fields or selected fields; change entities per use.
 * **Shared settings:** centrally manage values such as person colors and link them to multiple templates.
 * **Local exceptions:** change entities, design, `card_mod` and card-specific styles per linked card.
 * **Popups without an extra dashboard card:** open a library template through a `#Hash` button.
 * **Multiple popup links:** assign different hashes and local settings to the same template.
+* **Template organization:** defined inputs, categories/search, protection, selective rollback and change previews.
+* **Local uses:** inspect/edit, compare and duplicate linked variants; identify missing entities and local exceptions.
+* **Usage overview:** see references per template and open dashboard views or detected popups.
 * **Library management:** JSON import/export, history, restoration and checks for known dashboard uses.
 
 ### Two Separate Workspaces
@@ -115,7 +125,7 @@ Der [HACS-Standardantrag](https://github.com/hacs/default/pull/11851) ist einger
 2. **Installieren / Install:** Download **Library Card** in HACS.
 3. **Neustart / Restart:** Restart Home Assistant.
 4. **Einrichten / Setup:** Einstellungen / Settings → Geräte & Dienste / Devices & Services → Integration hinzufügen / Add integration → **Library Card**.
-5. **Ressource / Resource:** Enable advanced mode in your HA profile. Einstellungen / Settings → Dashboards → ⋮ → Ressourcen / Resources: add `/card_library/card-library.js?v=0.5.1` as **JavaScript-Modul / JavaScript module**.
+5. **Ressource / Resource:** Enable advanced mode in your HA profile. Einstellungen / Settings → Dashboards → ⋮ → Ressourcen / Resources: add `/card_library/card-library.js?v=0.5.2` as **JavaScript-Modul / JavaScript module**.
 6. **Browser neu laden / Reload browser:** In the dashboard card picker, choose **Kartenbibliothek** (card library) to manage templates or **Vorlagenkarte** (template card) to insert a linked card.
 
 [![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Baeka89&repository=library-card&category=integration)
@@ -176,7 +186,7 @@ tap_action:
 
 Der Hash muss zuvor in der Bibliothek gespeichert sein. / Save this hash in the library first.
 
-[Popup-Anleitung / Popup guide](BUBBLE-POPUPS.md)
+[Popup-Anleitung / Popup guide](BUBBLE-POPUPS.md) · [Button-Card-Vorlagen / Button Card templates](docs/BUTTON-TEMPLATES.md)
 
 ---
 
@@ -197,7 +207,7 @@ Der Hash muss zuvor in der Bibliothek gespeichert sein. / Save this hash in the 
 * **Grenzen / Limits:** The library and each resolved card are limited to 2 MB. Unsaved strategy dashboards and standalone screensavers cannot be fully imported.
 * **Vorschau / Preview:** Previews are real cards with active actions. Do not store access credentials in templates.
 
-[Weitere Bedienhinweise / More usage details](docs/USAGE.md) · [Tests und Prüfgrenzen / Tests and verification limits](docs/TESTS.md)
+[Neue Arbeitsabläufe / Workflows](docs/WORKFLOWS.md) · [Nutzungsübersicht / Usage overview](docs/USAGE-OVERVIEW.md) · [Weitere Bedienhinweise / More usage details](docs/USAGE.md) · [Tests und Prüfgrenzen / Tests and verification limits](docs/TESTS.md)
 
 ---
 
@@ -229,3 +239,9 @@ Maintained by **[@Baeka89](https://github.com/Baeka89)**. Thanks to Home Assista
 ### License / Lizenz
 
 [MIT License](LICENSE). External cards retain their own licenses. / Fremde Karten behalten ihre eigenen Lizenzen.
+
+### Projekt-Logo / Project icon
+
+Das freigegebene Logo liegt als `brand/icon.png` (256 px) und `brand/icon@2x.png` (512 px) in der Integration. Home Assistant 2026.3+ lädt diese lokalen Dateien für die Integrationsübersicht. Aktuelle HACS-Versionen nutzen die HA-Brand-Anzeige. Nach Installation oder Aktualisierung HA neu starten und den Browsercache bei Bedarf leeren. Die Sichtbarkeit vor der Installation hängt vom verwendeten HACS-/Marketplace-Index ab; ein lokales Projektupdate veröffentlicht das Logo noch nicht.
+
+The approved icon ships inside the integration as `brand/icon.png` (256 px) and `brand/icon@2x.png` (512 px). HA 2026.3+ serves these local assets for the integrations overview. Current HACS versions use HA branding. Restart HA after updating and clear the browser cache if necessary. Visibility before installation depends on the HACS/Marketplace index; updating this local project does not publish the icon.

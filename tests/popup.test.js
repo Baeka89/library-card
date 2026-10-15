@@ -74,6 +74,41 @@ test('unopened aliases never resolve their content during router updates', async
   assert.equal(errors.length,0); assert.equal(f.cards.length,1); f.controller.close();
 });
 
+test('new required inputs suspend stale native hash popups and recover on the same hash', async () => {
+  const {resolveTemplate} = await import('../custom_components/card_library/frontend/library-core.js');
+  let library = aliasLibrary(); const errors = [];
+  const f = fixture({validate:(_,ref)=>resolveTemplate(library,ref.template,ref.overrides)});
+  const router = createPopupHashRouter(f.env,f.controller,error=>errors.push(error));
+  f.win.location.hash = '#a'; router.setLibrary(library); await settle();
+  const previous = f.cards.at(-1); assert.equal(previous.connected,true);
+  library = structuredClone(library); library.templates.calendar.inputs = [{path:['cards',0,'title'],label:'Titel',type:'text',required:true}];
+  router.setLibrary(library); await settle();
+  assert.equal(previous.removed,true); assert.equal(f.win.location.hash,'#a'); assert.equal(errors.length,1); assert.match(errors[0].message,/Titel/);
+  library = structuredClone(library); library.templates.calendar.config.cards[0].title = 'Gültiger Titel';
+  router.setLibrary(library); await settle();
+  assert.equal(f.cards.length,2); assert.equal(f.cards.at(-1).connected,true); assert.equal(f.cards.at(-1).config.cards[0].title,'Gültiger Titel');
+  assert.equal(f.win.location.hash,'#a'); f.controller.close();
+});
+
+test('invalidating required native inputs cancels helpers already loading for that hash', async () => {
+  let release; const library = aliasLibrary(), errors = [];
+  const f = fixture({helpers:()=>new Promise(resolve=>{release=resolve;})});
+  const router = createPopupHashRouter(f.env,f.controller,error=>errors.push(error));
+  f.win.location.hash = '#a'; router.setLibrary(library); await settle();
+  const next = structuredClone(library); next.templates.calendar.inputs = [{path:['cards',0,'title'],label:'Titel',type:'text',required:true}];
+  router.setLibrary(next); release(nativeHelpers(f)); await settle();
+  assert.equal(f.cards.length,0); assert.equal(f.win.location.hash,'#a'); assert.equal(errors.length,1);
+});
+
+test('unopened native popup inputs do not evaluate unused dependencies', async () => {
+  const library = aliasLibrary();
+  library.templates.unopened = {name:'Unopened',config:{type:'custom:bubble-card',card_type:'pop-up',hash:'#unopened',cards:[{type:'markdown'}]},bindings:[{path:['cards',0,'content'],group:'unused'}],inputs:[{path:['cards',0,'title'],label:'Unused',type:'text',required:true}]};
+  library.groups.unused = {name:'Unused'}; Object.defineProperty(library.groups.unused,'value',{get(){throw Error('Unused dependency read');}});
+  const f = fixture(), errors = [], router = createPopupHashRouter(f.env,f.controller,error=>errors.push(error));
+  f.win.location.hash = '#a'; router.setLibrary(library); await settle();
+  assert.equal(errors.length,0); assert.equal(f.cards.length,1); f.controller.close();
+});
+
 test('removing the selected alias closes it while preserving the base and other aliases', async () => {
   const f = fixture(), library = aliasLibrary(), router = createPopupHashRouter(f.env,f.controller);
   f.win.location.hash = '#a'; router.setLibrary(library); await settle();

@@ -1,17 +1,27 @@
 """Publication tests run locally with fake GitHub calls; they never publish."""
 from pathlib import Path
 import importlib.util
+import hashlib
 import json
 from subprocess import CompletedProcess
 import os
 import tempfile
+import struct
 import unittest
+import zlib
+import zipfile
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("library_card_publisher", ROOT / "publish.py")
 publisher = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(publisher)
+spec = importlib.util.spec_from_file_location("release_builder", ROOT / "scripts/build_release.py")
+builder = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(builder)
+spec = importlib.util.spec_from_file_location("release_preflight", ROOT / "scripts/check_release.py")
+preflight = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(preflight)
 
 
 def result(command, stdout="", code=0, stderr=""):
@@ -19,6 +29,14 @@ def result(command, stdout="", code=0, stderr=""):
 
 
 class PublicationTest(unittest.TestCase):
+    def release_root(self, directory):
+        root = Path(directory)
+        component = root / "custom_components/card_library"
+        component.mkdir(parents=True)
+        (component / "manifest.json").write_text(json.dumps({"version": publisher.VERSION}))
+        (component / "config.py").write_text("example = 1\n")
+        return root, component
+
     def test_invalid_names_cannot_be_used_as_commands_or_paths(self):
         for name in ("--help", "../other", "owner/repository", "name;echo x", "name with spaces"):
             with self.subTest(name=name), self.assertRaises(publisher.PublicationError):
@@ -41,13 +59,121 @@ class PublicationTest(unittest.TestCase):
             publisher.stage_project(source, target)
             self.assertEqual((target / "hello.py").read_text(), "local edit")
 
+    def test_foreign_publication_marker_does_not_authorize_staging(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source"
+            target = Path(directory) / "target"
+            source.mkdir()
+            (source / "hello.py").write_text("original")
+            (target / ".publication").mkdir(parents=True)
+            (target / ".publication/project.json").write_text('{"project":"another-project"}')
+            with self.assertRaisesRegex(publisher.PublicationError, "Library Card"):
+                publisher.stage_project(source, target)
+            self.assertFalse((target / "hello.py").exists())
+
+    def test_staging_excludes_home_assistant_data_and_environment_secrets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source"
+            target = Path(directory) / "target"
+            source.mkdir()
+            for name in (".env", ".env.production", "secrets.yaml", "home-assistant.log.1", ".DS_Store", "README.md"):
+                (source / name).write_text("contents")
+            (source / ".storage").mkdir()
+            (source / ".storage/config").write_text("private")
+            publisher.stage_project(source, target)
+            self.assertEqual({p.name for p in target.iterdir()}, {"README.md", ".publication"})
+
     def test_release_archive_is_identical_after_file_timestamp_changes(self):
         spec=importlib.util.spec_from_file_location('release_builder',ROOT/'scripts/build_release.py');builder=importlib.util.module_from_spec(spec);spec.loader.exec_module(builder)
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);component=root/'custom_components/card_library';component.mkdir(parents=True)
-            manifest=component/'manifest.json';manifest.write_text('{"version":"0.5.1"}');(component/'config.py').write_text('example = 1\n')
+            manifest=component/'manifest.json';manifest.write_text('{"version":"0.5.2"}');(component/'config.py').write_text('example = 1\n')
             first=builder.build(root).read_bytes();os.utime(manifest,(2000000000,2000000000));second=builder.build(root).read_bytes()
             self.assertEqual(first,second)
+
+    def test_failed_release_read_preserves_existing_zip_and_checksums(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root, component = self.release_root(directory)
+            archive = builder.build(root)
+            checksums = root / "dist/SHA256SUMS.txt"
+            old_archive, old_checksums = archive.read_bytes(), checksums.read_bytes()
+            original_read = Path.read_bytes
+            def read(path):
+                if path == component / "config.py":
+                    raise OSError("Interrupted source read")
+                return original_read(path)
+            with patch.object(Path, "read_bytes", read), self.assertRaises(OSError):
+                builder.build(root)
+            self.assertEqual(archive.read_bytes(), old_archive)
+            self.assertEqual(checksums.read_bytes(), old_checksums)
+            self.assertEqual({p.name for p in (root / "dist").iterdir()}, {archive.name, checksums.name})
+
+    def test_release_rejects_directory_symlinks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root, component = self.release_root(directory)
+            outside = root / "outside"
+            outside.mkdir()
+            (outside / "private.py").write_text("private")
+            (component / "linked").symlink_to(outside, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "Symlink"):
+                builder.build(root)
+            self.assertFalse((root / "dist").exists())
+
+    def test_release_rejects_symlink_output_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root, _ = self.release_root(directory)
+            outside = root / "outside"
+            outside.mkdir()
+            (root / "dist").symlink_to(outside, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "symlink"):
+                builder.build(root)
+            self.assertEqual(list(outside.iterdir()), [])
+
+    def test_release_version_cannot_escape_output_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root, component = self.release_root(directory)
+            for version in ("../../outside", "0.5.2/../../other", "", None):
+                (component / "manifest.json").write_text(json.dumps({"version": version}))
+                with self.subTest(version=version), self.assertRaisesRegex(ValueError, "version"):
+                    builder.build(root)
+            self.assertFalse((root / "dist").exists())
+
+    def test_installable_zip_excludes_local_files_and_keeps_runtime_sources(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root, component = self.release_root(directory)
+            for name in (".env", ".env.production", "secrets.yaml", "home-assistant.log", ".DS_Store", "cached.pyc"):
+                (component / name).write_text("private")
+            (component / ".storage").mkdir()
+            (component / ".storage/data").write_text("private")
+            with zipfile.ZipFile(builder.build(root)) as bundle:
+                self.assertEqual(set(bundle.namelist()), {"custom_components/card_library/manifest.json", "custom_components/card_library/config.py"})
+
+    def test_approved_brand_assets_are_complete_decodable_png_streams(self):
+        for name, size in (("icon.png", 256), ("icon@2x.png", 512)):
+            data = (ROOT / "custom_components/card_library/brand" / name).read_bytes()
+            with self.subTest(name=name):
+                self.assertTrue(preflight.valid_png(data, size))
+                self.assertFalse(preflight.valid_png(data, size // 2))
+                self.assertFalse(preflight.valid_png(data[:-1], size))
+                self.assertFalse(preflight.valid_png(data + b"extra", size))
+                damaged = bytearray(data)
+                damaged[len(damaged) // 2] ^= 1
+                self.assertFalse(preflight.valid_png(bytes(damaged), size))
+
+    def test_short_png_headers_are_rejected_without_crashing(self):
+        data = (ROOT / "custom_components/card_library/brand/icon.png").read_bytes()
+        for count in range(40):
+            with self.subTest(count=count):
+                self.assertFalse(preflight.valid_png(data[:count], 256))
+
+    def test_png_pixels_and_filter_bytes_are_validated(self):
+        def chunk(kind, body):
+            return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body) & 0xFFFFFFFF)
+        header = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 6, 0, 0, 0))
+        for raw, accepted in ((b"\0\0\0\0\0", True), (b"\5\0\0\0\0", False), (b"\0", False), (b"\0" * 100000, False)):
+            data = header + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
+            with self.subTest(length=len(raw), accepted=accepted):
+                self.assertEqual(preflight.valid_png(data, 1), accepted)
 
     def test_account_switch_is_detected_before_further_remote_writes(self):
         class Fake:
@@ -78,6 +204,34 @@ class PublicationTest(unittest.TestCase):
         with self.assertRaises(publisher.PublicationError):
             publisher.wait_workflow(Fake(), "owner/library-card", "hacs.yml", "abc", 1)
 
+    def test_workflow_checks_every_job_page(self):
+        class Fake:
+            def run(self, command, **kwargs):
+                return result(command, json.dumps([{"databaseId": 1, "headSha": "abc", "status": "completed", "conclusion": "success", "url": "run"}]))
+            def api(self, endpoint):
+                if "page=2" in endpoint:
+                    return {"jobs": [{"conclusion": "skipped"}]}
+                return {"total_count": 101, "jobs": [{"conclusion": "success"}] * 100}
+        with self.assertRaisesRegex(publisher.PublicationError, "übersprungen"):
+            publisher.wait_workflow(Fake(), "owner/library-card", "hacs.yml", "abc", 1)
+
+    def test_workflow_incomplete_job_pages_stop_release(self):
+        class Fake:
+            def run(self, command, **kwargs):
+                return result(command, json.dumps([{"databaseId": 1, "headSha": "abc", "status": "completed", "conclusion": "success", "url": "run"}]))
+            def api(self, endpoint):
+                return {"total_count": 101, "jobs": [] if "page=2" in endpoint else [{"conclusion": "success"}] * 100}
+        with self.assertRaisesRegex(publisher.PublicationError, "vollständig"):
+            publisher.wait_workflow(Fake(), "owner/library-card", "hacs.yml", "abc", 1)
+
+    def test_workflow_accepts_complete_successful_job_pages(self):
+        class Fake:
+            def run(self, command, **kwargs):
+                return result(command, json.dumps([{"databaseId": 1, "headSha": "abc", "status": "completed", "conclusion": "success", "url": "run"}]))
+            def api(self, endpoint):
+                return {"total_count": 101, "jobs": [{"conclusion": "success"}] * (1 if "page=2" in endpoint else 100)}
+        self.assertEqual(publisher.wait_workflow(Fake(), "owner/library-card", "hacs.yml", "abc", 1)["headSha"], "abc")
+
     def test_successful_workflow_must_match_the_exact_commit(self):
         class Fake:
             def run(self, command, **kwargs):
@@ -91,6 +245,24 @@ class PublicationTest(unittest.TestCase):
                 return result(command, code=1, stderr="HTTP 401 authentication failed")
         with self.assertRaises(publisher.PublicationError):
             publisher.ensure_repository(Fake(), ROOT, "owner/library-card", {"login": "owner", "id": 1})
+
+    def test_separate_wrong_push_remote_stops_before_github_changes(self):
+        class Fake:
+            def run(self, command, cwd=None, allow_failure=False):
+                if command[:2] != ["git", "rev-parse"] and command[:2] != ["git", "branch"] and command[:2] != ["git", "remote"]:
+                    raise AssertionError("GitHub must not be contacted")
+                if command[:2] == ["git", "rev-parse"]:
+                    return result(command, str(cwd))
+                if command[:2] == ["git", "branch"]:
+                    return result(command, "main")
+                return result(command, "https://github.com/another/project.git" if "--push" in command else "https://github.com/owner/library-card.git")
+            def api(self, *args, **kwargs):
+                raise AssertionError("GitHub must not be changed")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / ".git").mkdir()
+            with self.assertRaisesRegex(publisher.PublicationError, "origin"):
+                publisher.ensure_repository(Fake(), root, "owner/library-card", {"login": "owner", "id": 1})
 
     def test_foreign_repository_branches_are_not_adopted_even_with_stale_zero_size(self):
         class Fake:
@@ -135,21 +307,60 @@ Link to current release: <>
 Link to successful HACS action: <>
 Link to successful hassfest action: <>
 '''
-        body=publisher.fill_hacs_template(template,{"html_url":"https://github.com/owner/repo/releases/tag/v0.5.1"},{"hacs":{"url":"https://github.com/run/hacs"},"hassfest":{"url":"https://github.com/run/hassfest"}})
+        body=publisher.fill_hacs_template(template,{"html_url":"https://github.com/owner/repo/releases/tag/v0.5.2"},{"hacs":{"url":"https://github.com/run/hacs"},"hassfest":{"url":"https://github.com/run/hassfest"}})
         self.assertEqual(body.count('[x]'),6);self.assertNotIn('[ ]',body);self.assertNotIn('<>',body);self.assertIn('<https://github.com/run/hacs>',body)
 
     def test_release_created_before_checks_cannot_be_submitted(self):
         class Fake:
             def run(self, command, **kwargs):
-                assets=[{"name":"library-card-v0.5.1.zip","state":"uploaded","size":3},{"name":"SHA256SUMS.txt","state":"uploaded","size":3}]
+                assets=[{"name":"library-card-v0.5.2.zip","state":"uploaded","size":3,"digest":"sha256:"+hashlib.sha256(b"zip").hexdigest()},{"name":"SHA256SUMS.txt","state":"uploaded","size":3,"digest":"sha256:"+hashlib.sha256(b"sum").hexdigest()}]
                 return result(command,json.dumps({"html_url":"release","published_at":"2026-10-12T10:00:00Z","assets":assets}))
             def api(self, endpoint):
                 if '/git/ref/' in endpoint:return {"object":{"type":"commit","sha":"abc"}}
                 return {"updated_at":"2026-10-12T11:00:00Z"}
         with tempfile.TemporaryDirectory() as directory:
-            root=Path(directory);(root/'dist').mkdir();(root/'dist/library-card-v0.5.1.zip').write_bytes(b'zip');(root/'dist/SHA256SUMS.txt').write_text('sum')
+            root=Path(directory);(root/'dist').mkdir();(root/'dist/library-card-v0.5.2.zip').write_bytes(b'zip');(root/'dist/SHA256SUMS.txt').write_text('sum')
             with self.assertRaisesRegex(publisher.PublicationError,'älter'):
                 publisher.release_repository(Fake(),root,'owner/library-card','abc',{"hacs":{"databaseId":1}})
+
+    def test_release_without_api_digest_must_match_downloaded_bytes(self):
+        class Fake:
+            def run(self, command, **kwargs):
+                if command[:3] == ["gh", "release", "download"]:
+                    name = command[command.index("--pattern") + 1]
+                    destination = Path(command[command.index("--dir") + 1]) / name
+                    destination.write_bytes(b"bad")
+                    return result(command)
+                assets = [{"name": "library-card-v0.5.2.zip", "state": "uploaded", "size": 3}, {"name": "SHA256SUMS.txt", "state": "uploaded", "size": 3}]
+                return result(command, json.dumps({"published_at": "2026-10-12T10:00:00Z", "assets": assets}))
+            def api(self, endpoint):
+                return {"object": {"type": "commit", "sha": "abc"}}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "dist").mkdir()
+            (root / "dist/library-card-v0.5.2.zip").write_bytes(b"zip")
+            (root / "dist/SHA256SUMS.txt").write_bytes(b"sum")
+            with self.assertRaisesRegex(publisher.PublicationError, "lokal geprüften"):
+                publisher.release_repository(Fake(), root, "owner/library-card", "abc", {})
+
+    def test_release_without_api_digest_accepts_identical_downloads(self):
+        class Fake:
+            def run(self, command, **kwargs):
+                if command[:3] == ["gh", "release", "download"]:
+                    name = command[command.index("--pattern") + 1]
+                    destination = Path(command[command.index("--dir") + 1]) / name
+                    destination.write_bytes(b"zip" if name.endswith(".zip") else b"sum")
+                    return result(command)
+                assets = [{"name": "library-card-v0.5.2.zip", "state": "uploaded", "size": 3}, {"name": "SHA256SUMS.txt", "state": "uploaded", "size": 3}]
+                return result(command, json.dumps({"html_url": "release", "published_at": "2026-10-12T10:00:00Z", "assets": assets}))
+            def api(self, endpoint):
+                return {"object": {"type": "commit", "sha": "abc"}}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "dist").mkdir()
+            (root / "dist/library-card-v0.5.2.zip").write_bytes(b"zip")
+            (root / "dist/SHA256SUMS.txt").write_bytes(b"sum")
+            self.assertEqual(publisher.release_repository(Fake(), root, "owner/library-card", "abc", {})["html_url"], "release")
 
     def test_existing_release_for_another_commit_is_never_overwritten(self):
         class Fake:

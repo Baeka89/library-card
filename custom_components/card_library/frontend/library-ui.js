@@ -2,6 +2,7 @@
 export const css = `
 :host{display:block;color:var(--primary-text-color);font-family:var(--ha-font-family-body,Roboto,Noto,sans-serif);--library-line:var(--divider-color);--library-muted:var(--secondary-text-color);--library-accent:var(--primary-color)}
 [data-library-ui]{box-sizing:border-box;min-width:0}
+[data-library-ui][hidden]{display:none!important}
 ha-card[data-library-ui]{padding:var(--ha-space-4,16px)}
 ha-card[data-library-ui].embedded{padding:0;border:0;background:transparent;box-shadow:none}
 .card-config[data-library-ui],.workflow-panel[data-library-ui]{display:flex;flex-direction:column;gap:var(--ha-space-4,16px);padding:16px 0}
@@ -23,6 +24,8 @@ input[data-library-ui][type=file]{font-size:var(--ha-font-size-s,14px)}
 button[data-library-ui]{border:0;background:transparent;border-radius:var(--ha-border-radius-pill,20px);min-height:40px;padding:8px 16px;cursor:pointer;color:var(--primary-color);font:inherit;font-weight:var(--ha-font-weight-medium,500);white-space:normal;overflow-wrap:anywhere}
 button[data-library-ui]:hover{background:var(--secondary-background-color)}
 button[data-library-ui]:disabled{cursor:default;opacity:.38}
+a[data-library-ui]{color:var(--primary-color);text-decoration:none;font-weight:var(--ha-font-weight-medium,500);padding:8px 0}
+a[data-library-ui]:hover{text-decoration:underline}
 [data-library-ui]:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}
 button.primary[data-library-ui]{background:var(--primary-color);color:var(--text-primary-color)}
 ha-button.primary[data-library-ui]::part(base){background:var(--primary-color);color:var(--text-primary-color);border-color:var(--primary-color)}
@@ -110,6 +113,7 @@ export function setSelectOptions(node, items) {
   if (node.tagName?.toLowerCase() === 'ha-select' && 'options' in node) {
     node.options = items.map(([value, label]) => ({value, label}));
   } else {
+    node.replaceChildren();
     for (const [value, label] of items) {
       const option = el(node.tagName?.toLowerCase() === 'ha-select' ? available('ha-list-item', 'mwc-list-item') || 'mwc-list-item' : 'option', label, node);
       option.value = value;
@@ -157,18 +161,25 @@ export function mountOriginalEditor(host, editor) {
 }
 
 export function whenOpen(section, task, repeat = false) {
-  let started = false, wasOpen = false;
+  let started = false, wasVisible = false;
   const failed = error => {
     started = false;
     if (section.isConnected) el('p', error.message || String(error), section).className = 'error';
   };
   const start = () => {
-    const opening = section.open && !wasOpen; wasOpen = section.open;
+    const visible = section.open && visibleInSections(section);
+    const opening = visible && !wasVisible; wasVisible = visible;
     if (!opening || !section.isConnected || (started && !repeat)) return;
     started = true;
     try { Promise.resolve(task()).catch(failed); } catch(error) { failed(error); }
   };
-  section.addEventListener('toggle', start); start();
+  // Restored child panels can be expanded while their parent remains closed.
+  // Defer their expensive work until the whole disclosure chain is visible.
+  section.addEventListener('toggle', start);
+  for (let parent = section.libraryParent || section.parentElement; parent; parent = parent.libraryParent || parent.parentElement) {
+    if ((parent.libraryTag || parent.tagName?.toLowerCase()) === 'details') parent.addEventListener('toggle', start);
+  }
+  start();
 }
 
 export function visibleInSections(node) {

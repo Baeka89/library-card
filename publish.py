@@ -16,12 +16,12 @@ import sys
 import tempfile
 import time
 
-VERSION = "0.5.1"
+VERSION = "0.5.2"
 TAG = f"v{VERSION}"
 SOURCE = Path(__file__).resolve().parent
 DESCRIPTION = "Reusable Home Assistant dashboard templates, shared settings and hash-based Bubble popups."
 TOPICS = ["home-assistant", "hacs", "lovelace", "custom-integration", "dashboard", "bubble-card", "templates"]
-EXCLUDED = {".git", ".venv", ".publication", "dist", "__pycache__", "node_modules", ".pytest_cache"}
+EXCLUDED = {".git", ".venv", ".publication", "dist", "__pycache__", "node_modules", ".pytest_cache", ".storage"}
 
 
 class PublicationError(RuntimeError):
@@ -68,7 +68,7 @@ def assert_identity(runner, user):
 def source_files(root):
     for path in sorted(root.rglob("*")):
         relative = path.relative_to(root)
-        if any(part in EXCLUDED for part in relative.parts) or path.suffix in {".pyc", ".pyo", ".zip"}:
+        if any(part in EXCLUDED or part == ".env" or part.startswith(".env.") for part in relative.parts) or path.name in {"secrets.yaml", ".DS_Store", "Thumbs.db"} or path.name.startswith("home-assistant.log") or path.suffix in {".pyc", ".pyo", ".zip"}:
             continue
         if path.is_symlink():
             raise PublicationError(f"Symlink im Quellpaket: {relative}")
@@ -79,6 +79,10 @@ def source_files(root):
 def stage_project(source, target):
     source, target = source.resolve(), target.expanduser().resolve()
     marker = target / ".publication/project.json"
+    if marker.is_file():
+        state = json.loads(marker.read_text(encoding="utf-8"))
+        if not isinstance(state, dict) or state.get("project") != "library-card":
+            raise PublicationError("Der Veröffentlichungsmarker gehört nicht zu Library Card.")
     if source != target:
         if target.is_relative_to(source) or source.is_relative_to(target):
             raise PublicationError("Quell- und Zielordner dürfen nicht ineinander liegen.")
@@ -133,7 +137,7 @@ def run_local_checks(runner, root):
     print("Lokale Prüfungen und isolierte Testabhängigkeiten …", flush=True)
     runner.run([python, "-m", "pip", "install", "--no-cache-dir", "--disable-pip-version-check", "-r", "requirements-dev.txt"], root)
     runner.run([python, "scripts/check_release.py", "--configured"], root)
-    for name in ("core", "tools", "ui", "native-ui", "resources", "family-calendar", "popup", "popup-resource"):
+    for name in ("core", "tools", "workflows", "ui", "native-ui", "resources", "family-calendar", "popup", "popup-resource"):
         runner.run(["node", f"tests/{name}.test.js"], root)
     for path in (root / "custom_components/card_library/frontend").glob("*.js"):
         runner.run(["node", "--check", path], root)
@@ -150,6 +154,19 @@ def set_git_identity(runner, root, user):
 
 
 def ensure_repository(runner, root, identity, user):
+    expected = f"https://github.com/{identity}.git"
+    has_git = (root / ".git").exists()
+    if has_git:
+        actual_root = runner.run(["git", "rev-parse", "--show-toplevel"], root).stdout.strip()
+        if Path(actual_root).resolve() != root.resolve():
+            raise PublicationError("Obersten Projektordner angeben.")
+        if runner.run(["git", "branch", "--show-current"], root).stdout.strip() != "main":
+            raise PublicationError("Veröffentlicht wird nur der vorbereitete main-Branch.")
+        remote = runner.run(["git", "remote", "get-url", "origin"], root, True)
+        if not remote.returncode:
+            push_remote = runner.run(["git", "remote", "get-url", "--push", "origin"], root)
+            if any(value.lower() != expected.lower() for value in (remote.stdout.strip(), push_remote.stdout.strip())):
+                raise PublicationError("Der bestehende origin-Remote zeigt auf ein anderes Repository.")
     existing = runner.run(["gh", "api", f"repos/{identity}"], allow_failure=True)
     if existing.returncode:
         if "HTTP 404" not in existing.stderr:
@@ -174,11 +191,10 @@ def ensure_repository(runner, root, identity, user):
                 raise PublicationError("Vorhandenes Repository hat bereits Branches; keine automatische Übernahme.")
     runner.api(f"repos/{identity}", "PATCH", {"description": DESCRIPTION, "has_issues": True, "homepage": f"https://github.com/{identity}#readme"})
     runner.api(f"repos/{identity}/topics", "PUT", {"names": TOPICS})
-    if not (root / ".git").exists():
+    if not has_git:
         runner.run(["git", "init", "--initial-branch=main"], root)
     set_git_identity(runner, root, user)
     remote = runner.run(["git", "remote", "get-url", "origin"], root, True)
-    expected = f"https://github.com/{identity}.git"
     if remote.returncode:
         runner.run(["git", "remote", "add", "origin", expected], root)
     elif remote.stdout.strip().lower() != expected.lower():
@@ -203,6 +219,8 @@ def ensure_repository(runner, root, identity, user):
 
 
 def wait_workflow(runner, identity, filename, sha, timeout):
+    if timeout <= 0:
+        raise PublicationError("Zeitlimit muss positiv sein.")
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         result = runner.run(["gh", "run", "list", "--repo", identity, "--workflow", filename, "--commit", sha, "--event", "push", "--limit", "20", "--json", "databaseId,status,conclusion,url,headSha"], allow_failure=True)
@@ -218,8 +236,24 @@ def wait_workflow(runner, identity, filename, sha, timeout):
                 if run["status"] == "completed":
                     if run["conclusion"] != "success":
                         raise PublicationError(f'{filename} ist nicht erfolgreich: {run["url"]}. Kein Release/HACS-Antrag erstellt.')
-                    jobs = runner.api(f'repos/{identity}/actions/runs/{run["databaseId"]}/jobs?per_page=100')
-                    if not jobs.get("jobs") or any(job.get("conclusion") != "success" for job in jobs["jobs"]):
+                    endpoint = f'repos/{identity}/actions/runs/{run["databaseId"]}/jobs?per_page=100'
+                    page = runner.api(endpoint)
+                    jobs = page.get("jobs", [])
+                    if not isinstance(jobs, list):
+                        raise PublicationError("GitHub lieferte eine ungültige Job-Liste.")
+                    total = page.get("total_count", len(jobs))
+                    number = 1
+                    if not isinstance(total, int) or total < len(jobs):
+                        raise PublicationError("GitHub lieferte eine ungültige Job-Liste.")
+                    while len(jobs) < total:
+                        number += 1
+                        following = runner.api(f"{endpoint}&page={number}").get("jobs", [])
+                        if not isinstance(following, list) or not following:
+                            raise PublicationError("Die erforderlichen GitHub-Jobs sind nicht vollständig prüfbar.")
+                        jobs.extend(following)
+                    if len(jobs) != total:
+                        raise PublicationError("GitHub lieferte eine widersprüchliche Job-Liste.")
+                    if not jobs or any(job.get("conclusion") != "success" for job in jobs):
                         raise PublicationError("Ein erforderlicher Job wurde übersprungen oder ist fehlgeschlagen.")
                     return run
         time.sleep(5)
@@ -256,6 +290,12 @@ def release_repository(runner, root, identity, sha, checks):
             raise PublicationError("Release-Dateien fehlen oder sind unvollständig. Kein HACS-Antrag.")
         if asset.get("digest") and asset["digest"] != "sha256:" + hashlib.sha256(local.read_bytes()).hexdigest():
             raise PublicationError("Release-Prüfsumme stimmt nicht mit dem lokalen Paket überein.")
+        if not asset.get("digest"):
+            with tempfile.TemporaryDirectory(prefix="library-card-release-check-") as directory:
+                runner.run(["gh", "release", "download", TAG, "--repo", identity, "--pattern", name, "--dir", directory])
+                downloaded = Path(directory) / name
+                if not downloaded.is_file() or hashlib.sha256(downloaded.read_bytes()).digest() != hashlib.sha256(local.read_bytes()).digest():
+                    raise PublicationError("Release-Datei stimmt nicht mit dem lokal geprüften Paket überein.")
     published = datetime.fromisoformat(release["published_at"].replace("Z", "+00:00"))
     for run in checks.values():
         details = runner.api(f'repos/{identity}/actions/runs/{run["databaseId"]}')
@@ -355,7 +395,7 @@ def submit_hacs(runner, root, identity, user, release, checks):
 
 
 def main(argv=None, runner=None):
-    parser = argparse.ArgumentParser(description="Library Card v0.5.1 vorbereiten, veröffentlichen und bei HACS einreichen.")
+    parser = argparse.ArgumentParser(description="Library Card v0.5.2 vorbereiten, veröffentlichen und bei HACS einreichen.")
     parser.add_argument("--project-dir", type=Path, help="Lokaler Projekteordner; ohne Angabe wird der entpackte Quellordner verwendet")
     parser.add_argument("--owner", help="GitHub-Benutzer; standardmäßig der angemeldete Benutzer")
     parser.add_argument("--repo", default="library-card")
@@ -368,6 +408,8 @@ def main(argv=None, runner=None):
     runner = runner or Runner()
     if sys.version_info < (3, 12):
         raise PublicationError("Python 3.12 oder neuer wird benötigt.")
+    if args.timeout <= 0:
+        raise PublicationError("Zeitlimit muss positiv sein.")
     if args.submit_hacs and (not args.publish or not args.ack_publishing_docs):
         raise PublicationError("HACS-Einreichung benötigt --publish und --ack-publishing-docs. https://www.hacs.xyz/docs/publish/include/")
     target = args.project_dir or SOURCE
@@ -394,6 +436,7 @@ def main(argv=None, runner=None):
         print(f"Lokal vorbereitet und geprüft: {root}. Noch nichts auf GitHub veröffentlicht.")
         return 0
     identity = f"{owner}/{args.repo}"
+    assert_identity(runner, user)
     sha = ensure_repository(runner, root, identity, user)
     print("GitHub-Prüfungen abwarten. Bei Fehlern stoppt der Ablauf vor Release und Antrag.", flush=True)
     checks = {name: wait_workflow(runner, identity, f"{name}.yml", sha, args.timeout) for name in ("hacs", "hassfest", "tests")}

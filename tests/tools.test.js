@@ -104,3 +104,66 @@ test('popup usage matches browser-normalized YAML navigation hashes without matc
   assert.equal(found.length, 3);
   assert.deepEqual(found.map(card => card.path.at(-2)), [0,1,2]);
 });
+
+test('usage navigation resolves named views, numeric views and default dashboard safely',async()=>{
+  const {usageLocationUrl}=await import('../custom_components/card_library/frontend/library-tools.js');
+  assert.equal(usageLocationUrl({url_path:'dashboard-test',view_path:'wohnzimmer',path:['views',2,'cards',0]}),'/dashboard-test/wohnzimmer');
+  assert.equal(usageLocationUrl({url_path:null,path:['views',0,'sections',1,'cards',0]}),'/lovelace/0');
+  assert.equal(usageLocationUrl({url_path:'//evil.example',view_path:'room?q=1#x'}),'/%2F%2Fevil.example/room%3Fq%3D1%23x');
+  assert.equal(usageLocationUrl({url_path:'dashboard',path:['views',-1]}),null);
+  assert.equal(usageLocationUrl({view_path:'..',path:['views',0]}),null);
+});
+
+test('popup location links preserve browser encoded hashes without double encoding',async()=>{
+  const {usageLocationUrl}=await import('../custom_components/card_library/frontend/library-tools.js');
+  const source={url_path:'dashboard',view_path:'home',reference:{popup_hash:'#Men%C3%BC'}};
+  assert.equal(usageLocationUrl(source,true),'/dashboard/home#Men%C3%BC');
+  assert.equal(usageLocationUrl({...source,reference:{popup_hash:'#Menü'}},true),'/dashboard/home#Men%C3%BC');
+  assert.equal(usageLocationUrl(source,false),'/dashboard/home');
+});
+
+test('usage counts distinguish references and popup actions without counting ancestor stacks',async()=>{
+  const {usageSummary}=await import('../custom_components/card_library/frontend/library-tools.js');
+  globalThis.window={location:{href:'https://ha.example/lovelace/0'}};
+  const config={views:[{path:'family',cards:[{type:'horizontal-stack',cards:[{type:'custom:library-card',template:'t'},{type:'button',tap_action:{action:'navigate',navigation_path:'#popup'},hold_action:{action:'fire-dom-event',card_library:{action:'popup',template:'t'}}}]}]}]};
+  const inventory=await scanDashboards({callWS:async message=>message.type==='lovelace/config'?config:[]});
+  const result=usageSummary(inventory,'t',{templates:{t:{popup:{hash:'#popup'}}}});
+  assert.equal(result.cards,1);assert.equal(result.popups,2);assert.equal(result.locations.length,3);
+  assert.equal(result.locations[0].view_path,'family');
+});
+
+test('scan starts independent resource reads before dashboard configuration completes', async () => {
+  let resourcesStarted=false,finishResources;
+  const pendingResources=new Promise(resolve=>{finishResources=resolve;});
+  const scan=scanDashboards({callWS:async message=>{
+    if(message.type==='lovelace/resources/list'){resourcesStarted=true;return pendingResources;}
+    if(message.type==='lovelace/dashboards/list')return [];
+    assert.equal(resourcesStarted,true);
+    finishResources([{url:'/card.js'}]);return {views:[]};
+  }});
+  const inventory=await scan;
+  assert.equal(inventory.resourcesAvailable,true);
+});
+
+test('saved scans index actions once while current popup assignments remain live', async () => {
+  globalThis.window={location:{href:'https://ha.example/lovelace/0'}};
+  const inventory=await scanDashboards({callWS:async message=>message.type==='lovelace/config'?{views:[{cards:[{type:'button',tap_action:{action:'navigate',navigation_path:'#saved'}}]}]}:[]});
+  let reads=0;
+  const config=inventory.cards[0].config, action=config.tap_action;
+  Object.defineProperty(config,'tap_action',{enumerable:true,get(){reads++;return action;}});
+  const library={templates:{one:{popup:{hash:'#saved'}},two:{popup:{hash:'#other'}}}};
+  assert.equal(usages(inventory,'one',library).length,1);
+  const indexedReads=reads;
+  for(let row=0;row<40;row++){assert.equal(usages(inventory,'two',library).length,0);assert.equal(usages(inventory,'one',library).length,1);}
+  assert.equal(reads,indexedReads);
+  library.templates.one.popup.hash='#other';library.templates.two.popup.hash='#saved';
+  assert.equal(usages(inventory,'one',library).length,0);assert.equal(usages(inventory,'two',library).length,1);
+});
+
+test('an invalid view or section does not hide readable uses elsewhere in that dashboard',async()=>{
+  const inventory=await scanDashboards({callWS:async message=>message.type==='lovelace/config'?{views:[null,{title:'Valid',sections:[null,{cards:[{type:'custom:library-card',template:'kept'}]}]}]}:[]});
+  assert.equal(inventory.failures.length,2);
+  assert.equal(usages(inventory,'kept').length,1);
+  assert.equal(inventory.destinations.length,1);
+  assert.deepEqual(inventory.destinations[0].path,['views',1,'sections',1,'cards']);
+});

@@ -1,7 +1,7 @@
-import {confirmAction} from './library-ui.js?v=0.5.1';
-import {clone, getAt, setAt, resolveTemplate, overlap, bindingValue, exportLibrary, importLibrary, changedTemplates, newId} from './library-core.js?v=0.5.1';
-import {scanDashboards, usages, dependencyReport} from './library-tools.js?v=0.5.1';
-import {createRenderedCard} from './library-ha-ui.js?v=0.5.1';
+import {confirmAction} from './library-ui.js?v=0.5.2';
+import {clone, getAt, setAt, resolveTemplate, overlap, bindingValue, exportLibrary, importLibrary, changedTemplates, newId} from './library-core.js?v=0.5.2';
+import {scanDashboards, usages, usageSummary, usageLocationUrl, dependencyReport} from './library-tools.js?v=0.5.2';
+import {createRenderedCard} from './library-ha-ui.js?v=0.5.2';
 
 export function installTools(Manager, {el, field, button, select, tree, whenOpen}) {
   Object.assign(Manager.prototype, {
@@ -14,27 +14,32 @@ export function installTools(Manager, {el, field, button, select, tree, whenOpen
     async checkRemovedTemplates(candidate) {
       const removed = Object.keys(this.state.library.templates).filter(id => !Object.hasOwn(candidate.templates, id));
       if (!removed.length) return;
-      this.inventory = await scanDashboards(this._hass);
+      const state = this.state, library = state.library, inventory = await scanDashboards(this._hass);
+      this.assertLibraryConnection(state);
+      if (state.library !== library) throw Error('Die Bibliothek wurde inzwischen geändert. Prüfung erneut starten.');
+      this.inventory = inventory;
       if (removed.some(id => usages(this.inventory, id, this.state.library).length)) throw Error('Verwendete Vorlagen würden entfernt. Zuerst die Dashboard-Verwendungen anpassen.');
       if (this.inventory.failures.length && !await confirmAction(this, 'Die Dashboard-Prüfung ist unvollständig. Bibliothek trotzdem speichern?')) throw Error('Speichern abgebrochen.');
     },
     async scan() {
       if (this.scanning) return;
       this.scanning = true; this.render();
-      try { this.inventory = await scanDashboards(this._hass); }
+      const state = this.state, hass = this._hass;
+      try { const inventory = await scanDashboards(hass); this.assertLibraryConnection(state); this.inventory = inventory; }
       catch (error) { this.notice = error.message || String(error); }
       this.scanning = false; this.render();
     },
     renderTools(card) {
-      const activeMode = ['groups', 'people'].includes(this.mode) ? this.mode : 'templates';
-      select(card, [['templates', 'Kartenvorlagen'], ['groups', 'Gemeinsame Einstellungen'], ['people', 'Personen']], activeMode,
-        value => { this.mode = value; this.selected = null; this.path = null; this.groupPath = null; this.render(); }, 'Konfigurationsbereich');
+      const activeMode = ['groups', 'people', 'usage'].includes(this.mode) ? this.mode : 'templates';
+      select(card, [['templates', 'Kartenvorlagen'], ['groups', 'Gemeinsame Einstellungen'], ['people', 'Personen'], ['usage', 'Nutzungsübersicht']], activeMode,
+        value => { this.mode = value; this.selected = null; this.path = null; this.groupPath = null; this.render(); if (value === 'usage' && !this.inventory) this.scan(); }, 'Konfigurationsbereich');
       const actions = el('div', undefined, card); actions.className = 'library-actions';
       const create = el('details', undefined, actions); create.className = 'action-menu'; el('summary', 'Vorlage hinzufügen', create);
       button(create, 'Neue Karte', () => { this.mode = 'create'; this.selected = null; this.render(); });
       button(create, 'Karte aus YAML', () => { this.mode = 'yaml'; this.render(); });
       button(create, 'Dashboards / Übernahme', () => { this.mode = 'dashboards'; this.render(); if (!this.inventory) this.scan(); });
       const tools = el('details', undefined, actions); tools.className = 'action-menu'; el('summary', 'Werkzeuge', tools);
+      button(tools, 'Nutzungsübersicht', () => { this.mode = 'usage'; this.render(); if (!this.inventory) this.scan(); });
       const maintenance = el('details', undefined, tools); el('summary', 'Verlauf und Wartung', maintenance);
       const toolbar = maintenance;
       button(toolbar, 'Entwurf verwerfen / neu laden', () => {
@@ -58,13 +63,21 @@ export function installTools(Manager, {el, field, button, select, tree, whenOpen
       file.onchange = () => this.run(async () => {
         const selected = file.files[0]; if (!selected) return;
         if (selected.size > 32 * 1024 * 1024) throw Error('Importdatei überschreitet 32 MiB');
-        this.pendingImport = importLibrary(JSON.parse(await selected.text())); this.mode = 'import';
+        const state = this.state, draft = this.draft, signature = JSON.stringify(draft);
+        const imported = importLibrary(JSON.parse(await selected.text()));
+        this.assertLibraryConnection(state);
+        if (this.draft !== draft || JSON.stringify(draft) !== signature) throw Error('Der Entwurf wurde inzwischen geändert. Import erneut prüfen.');
+        this.pendingImport = imported; this.mode = 'import';
       });
       el('p', 'Import und Wiederherstellung ersetzen die gesamte Bibliothek.', tools).className = 'hint';
-      if (!['people', 'dashboards', 'preview', 'history', 'import', 'yaml', 'create'].includes(this.mode)) return false;
+      if (!['people', 'usage', 'local-use', 'compare-use', 'review', 'dashboards', 'preview', 'history', 'import', 'yaml', 'create'].includes(this.mode)) return false;
       const back = () => { this.mode = 'templates'; this.selected = null; this.render(); };
       button(card, 'Zurück zu Vorlagen', back).className = 'back-link';
       if (this.mode === 'people') this.peoplePanel(card);
+      if (this.mode === 'usage') this.usagePanel(card);
+      if (this.mode === 'local-use') this.localUsePanel(card);
+      if (this.mode === 'compare-use') this.compareUsePanel(card);
+      if (this.mode === 'review') this.reviewPanel(card);
       if (this.mode === 'dashboards') this.dashboardPanel(card);
       if (this.mode === 'preview') this.previewPanel(card);
       if (this.mode === 'history') this.historyPanel(card);
@@ -75,7 +88,7 @@ export function installTools(Manager, {el, field, button, select, tree, whenOpen
     },
     yamlPanel(card) {
       el('h3', 'Kartenkonfiguration direkt einfügen', card);
-      el('p', 'Karten-YAML mit Entitäten und Einstellungen einfügen. Kopf-/Fußzeilen nutzen card und optional max_width. JSON importiert eine ganze Bibliothek.', card);
+      el('p', 'Karten-YAML mit Entitäten und Einstellungen einfügen. Kopf-/Fußzeilen nutzen card und optional max_width. button_card_templates wird in benannte Button-Card-Vorlagen umgewandelt. JSON importiert eine ganze Bibliothek.', card);
       const text = field(card, 'Karten-YAML', 'textarea', false); text.rows = 14; text.value = this.yamlDraft || '';
       text.placeholder = 'type: custom:energy-flow-card-plus\ntitle: Energiefluss';
       text.setAttribute('aria-label', 'Karten-YAML'); text.setAttribute('style', 'width:100%;box-sizing:border-box;font-family:monospace');
@@ -83,8 +96,26 @@ export function installTools(Manager, {el, field, button, select, tree, whenOpen
       button(card, 'YAML als Karte übernehmen', () => this.run(async () => {
         const source = this.yamlDraft || text.value;
         if (!source.trim()) throw Error('Bitte eine Kartenkonfiguration einfügen.');
-        const config = await this._hass.callWS({type: 'card_library/parse_card', yaml: source});
-        if (this.addTemplate(config)) this.yamlDraft = '';
+        const state = this.state, library = state.library, draft = this.draft, signature = JSON.stringify(draft);
+        const current = () => {
+          this.assertLibraryConnection(state);
+          if (state.library !== library || this.draft !== draft || JSON.stringify(draft) !== signature) throw Error('Die Bibliothek wurde inzwischen geändert. Import erneut prüfen.');
+        };
+        if (/^\s*(?:button_card_templates|"button_card_templates"|'button_card_templates')\s*:/m.test(source)) {
+          const entries = await this._hass.callWS({type:'card_library/parse_templates',yaml:source});
+          current();
+          const candidate = clone(draft); delete candidate.revision;
+          let selected;
+          for (const entry of entries) { do { selected = newId(); } while (Object.hasOwn(candidate.templates,selected)); candidate.templates[selected] = clone(entry); }
+          const validated = importLibrary({format:'ha-card-library',version:2,library:candidate});
+          if (!selected) throw Error('Keine Button-Card-Vorlagen gefunden.');
+          this.draft = {...validated, revision:draft.revision}; this.selected = selected; this.mode = 'templates'; this.path = null; this.yamlDraft = '';
+          this.edit(); this.render();
+        } else {
+          const config = await this._hass.callWS({type: 'card_library/parse_card', yaml: source});
+          current();
+          if (this.addTemplate(config)) this.yamlDraft = '';
+        }
       }));
       el('p', 'Entwurf im originalen Editor prüfen und zentral speichern. Vorhandene Vorlagen bleiben erhalten.', card);
     },
@@ -159,6 +190,42 @@ export function installTools(Manager, {el, field, button, select, tree, whenOpen
       }
       el('p', 'Die Übernahme kopiert die Konfiguration. Die Originalkarte bleibt bestehen. Verknüpfungen findest du unter „Im Dashboard einbauen“.', card);
     },
+    usageLink(parent, use) {
+      const row = el('div', undefined, parent); row.className = 'row';
+      el('span', `${use.dashboard || 'Standard-Dashboard'} / ${use.view || use.view_index || 0} / ${use.path.join(' → ')}`, row);
+      const target = usageLocationUrl(use, Boolean(use.reference?.popup_hash));
+      if (target) {
+        const link = el('a', use.reference?.popup_hash ? 'Popup öffnen' : 'Ansicht öffnen', row);
+        link.href = target; link.target = '_blank'; link.rel = 'noopener'; link.title = 'In neuem Tab öffnen'; link.setAttribute('aria-label', `${link.textContent}: ${use.dashboard || 'Standard-Dashboard'} / ${use.view || use.view_index || 0}`);
+      }
+      this.usageActions(row,use);
+    },
+    usagePanel(card) {
+      el('h3', 'Nutzungsübersicht', card);
+      el('p', 'Gespeicherte Kartenverknüpfungen und statische Popup-Aufrufe. Die Zahl zählt Fundstellen, nicht Öffnungen.', card);
+      button(card, this.scanning ? 'Liest Dashboards …' : 'Übersicht aktualisieren', () => this.scan()).disabled = this.scanning;
+      if (!this.inventory) { el('p', 'Noch nicht geprüft. Dashboards einlesen, um die Nutzung zu sehen.', card); return; }
+      el('p', 'Stand: ' + new Date(this.inventory.scannedAt).toLocaleString(), card);
+      if (this.inventory.failures.length) el('p', 'Prüfung unvollständig. Die Zahlen zeigen nur gefundene Verwendungen.', card).className = 'error';
+      for (const failure of this.inventory.failures) el('p', failure, card).className = 'error';
+      const filter = field(card, 'Vorlagen filtern'); filter.value = this.usageFilter || '';
+      filter.onchange = () => { this.usageFilter = filter.value; this.render(); };
+      const categories=[...new Set(Object.values(this.draft.templates).map(item=>item.category || ''))].sort();
+      select(card,[['all','Alle Kategorien'],...categories.map(category=>[JSON.stringify(category),category || 'Ohne Kategorie'])],this.usageCategory==null?'all':JSON.stringify(this.usageCategory),value=>{this.usageCategory=value==='all'?null:JSON.parse(value);this.render();},'Kategorie der Übersicht');
+      const templates = Object.entries(this.draft.templates).filter(([,template])=>this.usageCategory==null||(template.category || '')===this.usageCategory).sort((a,b)=>a[1].name.localeCompare(b[1].name));
+      for (const [id, template] of templates) {
+        if (this.usageFilter && !`${template.name} ${template.category || ''} ${template.config.type}`.toLowerCase().includes(this.usageFilter.toLowerCase())) continue;
+        const summary = usageSummary(this.inventory,id,this.state.library);
+        const section = el('details', undefined, card);
+        el('summary', `${template.name} · ${summary.locations.length} ${summary.locations.length === 1 ? 'Fundstelle' : 'Fundstellen'}`, section);
+        el('p', `${summary.cards} ${summary.cards === 1 ? 'Kartenverknüpfung' : 'Kartenverknüpfungen'} · ${summary.popups} ${summary.popups === 1 ? 'Popup-Aufruf' : 'Popup-Aufrufe'}`, section);
+        button(section, 'Vorlage bearbeiten', () => { this.mode = 'templates'; this.selected = id; this.render(); });
+        for (const use of summary.locations) this.usageLink(section,use);
+        if (!summary.locations.length) el('p', this.inventory.failures.length ? 'Keine Fundstelle in den gelesenen Dashboards. Weitere Verwendungen sind möglich.' : 'Keine Verknüpfung in den gelesenen Dashboards gefunden.', section);
+      }
+      if (!templates.length) el('p', 'Noch keine Vorlagen vorhanden.', card);
+      el('p', 'Links öffnen Ansicht oder Popup in einem neuen Tab. HA bietet keinen stabilen Direktlink zu einer einzelnen Karte. Erkannte Popup-Hashes öffnen das Popup. Dynamische JavaScript-/Jinja-Aufrufe sind nicht zuverlässig zählbar.', card);
+    },
     templateTools(card, item) {
       const box = el('details', undefined, card); el('summary', 'Verwendungen und Abhängigkeiten', box);
       whenOpen(box, () => {
@@ -167,7 +234,7 @@ export function installTools(Manager, {el, field, button, select, tree, whenOpen
         el('p', 'Bestandsaufnahme: ' + new Date(this.inventory.scannedAt).toLocaleString(), box);
         const found = usages(this.inventory, this.selected, this.state.library);
         el('p', found.length ? `${found.length} Verwendung(en):` : 'Keine Verwendung in den gelesenen Dashboards gefunden.', box);
-        for (const use of found) el('p', `${use.dashboard} / ${use.view} / ${use.path.join(' → ')}`, box);
+        for (const use of found) this.usageLink(box,use);
         for (const failure of this.inventory.failures) el('p', 'Unvollständig: ' + failure, box).className = 'error';
       } else el('p', 'Verwendungen noch nicht geprüft.', box);
       const report = dependencyReport(this._hass, resolveTemplate(this.draft, this.selected), item.dependencies, this.inventory?.resources);
@@ -195,6 +262,7 @@ export function installTools(Manager, {el, field, button, select, tree, whenOpen
       });
     },
     async deleteItem(mode, id) {
+      if(mode==='templates'&&(this.draft.templates[id]?.protected||this.state.library.templates[id]?.protected))throw Error('Vorlagenschutz zuerst separat aufheben.');
       if (mode === 'groups' || mode === 'people') {
         if (Object.values(this.draft.templates).some(t => t.bindings?.some(b => mode === 'groups' ? b.group === id : b.person === id))) {
           this.notice = 'Dieser Eintrag wird noch von Vorlagen verwendet.'; this.render(); return;
@@ -202,7 +270,11 @@ export function installTools(Manager, {el, field, button, select, tree, whenOpen
       }
       if (mode === 'templates') {
         this.notice = 'Prüfe Verwendungen vor dem Löschen …'; this.render();
-        const inventory = await scanDashboards(this._hass); this.inventory = inventory;
+        const state = this.state, library = state.library, draft = this.draft, signature = JSON.stringify(draft);
+        const inventory = await scanDashboards(this._hass);
+        this.assertLibraryConnection(state);
+        if (state.library !== library || this.draft !== draft || JSON.stringify(draft) !== signature) throw Error('Die Bibliothek wurde inzwischen geändert. Löschprüfung erneut starten.');
+        this.inventory = inventory;
         if (usages(inventory, id, this.state.library).length) { this.notice = 'Vorlage wird in Dashboards verwendet und kann nicht gelöscht werden.'; this.render(); return; }
         if (inventory.failures.length && !await confirmAction(this, 'Einige Dashboards oder Ressourcen konnten nicht geprüft werden. Trotzdem löschen?')) { this.notice = 'Löschen abgebrochen.'; this.render(); return; }
       }
@@ -271,6 +343,7 @@ export function installTools(Manager, {el, field, button, select, tree, whenOpen
           this.draftState = this.state;
           this.edit(); this.mode = 'preview'; this.render();
         });
+        for(const [id,template] of Object.entries(snapshot.library.templates))button(box,'Nur Vorlage zurücknehmen: '+template.name,()=>this.run(()=>this.restoreTemplate(snapshot,id)));
         button(box, 'Diese Version wiederherstellen', () => this.run(async () => {
           // Reject deleted template IDs still referenced by known dashboards.
           const state = this.state, hass = this._hass, baseline = clone(state.library);
