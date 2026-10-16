@@ -1,11 +1,12 @@
-import {css, el, field, setSelectOptions, confirmAction, captureDisclosures, mountOriginalEditor, whenOpen, visibleInSections} from './library-ui.js?v=1.0.0';
-import {STANDARD_CARDS, cardConstructor, cachedOriginalEditor, updateOriginalEditor, createRenderedCard} from './library-ha-ui.js?v=1.0.0';
-import {editorOverrides, restoreBindings, updateLocalField, designOverrides, clone, getAt, setAt, resolveTemplate, overlap, bindingValue, newId, validateCard, importLibrary, validatePopupRoutes, popupTemplateInfo, popupTemplateRoute, inputErrors} from './library-core.js?v=1.0.0';
-import {configurationYaml, scanDashboards, usages} from './library-tools.js?v=1.0.0';
-import {installTools} from './library-manager-tools.js?v=1.0.0';
-import {installWorkflows} from './library-workflows.js?v=1.0.0';
-import {installYamlTools} from './library-yaml-export.js?v=1.0.0';
-import {installPopupActions} from './library-popup.js?v=1.0.0';
+import {css, el, field, setSelectOptions, confirmAction, captureDisclosures, mountOriginalEditor, whenOpen, visibleInSections} from './library-ui.js?v=1.1.0';
+import {STANDARD_CARDS, cardConstructor, cachedOriginalEditor, updateOriginalEditor, createRenderedCard} from './library-ha-ui.js?v=1.1.0';
+import {editorOverrides, restoreBindings, updateLocalField, designOverrides, clone, getAt, setAt, resolveTemplate, overlap, bindingValue, newId, validateCard, importLibrary, validatePopupRoutes, popupTemplateInfo, popupTemplateRoute, inputErrors} from './library-core.js?v=1.1.0';
+import {configurationYaml, scanDashboards, usages} from './library-tools.js?v=1.1.0';
+import {installTools} from './library-manager-tools.js?v=1.1.0';
+import {installWorkflows} from './library-workflows.js?v=1.1.0';
+import {installYamlTools} from './library-yaml-export.js?v=1.1.0';
+import {installButtonCardConverter} from './library-converter-ui.js?v=1.1.0';
+import {installPopupActions} from './library-popup.js?v=1.1.0';
 const clients = new WeakMap();
 // Inspect only requested templates and their actual dependencies. Snapshot data
 // is authoritative; no draft or persistent browser data enters these caches.
@@ -522,6 +523,7 @@ class LibraryEditor extends Base {
   resetLocalContext() {
     this.localPath = null; this.stylePath = null;
     this.localStyleDraft = null; this.localYamlDraft = null;
+    this.converterDraft = null; this.converterRefresh = null;
     this.popupUsageRefresh = null; this.popupUsageTemplate = null;
     this.bubbleOptions = {}; this.popupLinkOverrides = null; this.popupLinkDraft = null;
   }
@@ -734,7 +736,7 @@ class LibraryEditor extends Base {
       const reset = button(row,'Wert aus Vorlage übernehmen',()=>update(undefined,true)); reset.disabled = Boolean(locked);
     }
   }
-  changed() { this.popupUsageRefresh?.(); this.dispatchEvent(new CustomEvent('config-changed', {detail: {config: clone(this.config)}, bubbles: true, composed: true})); }
+  changed() { this.popupUsageRefresh?.(); this.converterRefresh?.(); this.dispatchEvent(new CustomEvent('config-changed', {detail: {config: clone(this.config)}, bubbles: true, composed: true})); }
   render() {
     if (this._detached) return;
     this.libraryRenderState = this.state;
@@ -789,6 +791,7 @@ class LibraryEditor extends Base {
     button(inheritance, 'Lokale Anpassungen zurücksetzen', reset);
     try {
       const resolved = resolveTemplate(this.state.library, this.config.template, this.config.overrides);
+      this.buttonCardConverterPanel(panel, resolved);
       this.definedInputPanel(panel,resolved);
       this.buttonVariablePanel(panel, resolved);
       if(!this.usageEditing)popupUsage(panel, this, this.config.template, this.config.overrides || []);
@@ -1151,6 +1154,7 @@ class LibraryManager extends Base {
 installTools(LibraryManager, {el, field, button, select, tree, whenOpen});
 installWorkflows(LibraryManager, {el,field,button,select,whenOpen});
 installYamlTools(LibraryManager, {el,field,button,select,whenOpen});
+installButtonCardConverter(LibraryEditor, {el,field,button,whenOpen});
 LibraryEditor.prototype.previewCard = LibraryManager.prototype.previewCard;
 class LibraryManagerEditor extends LibraryManager {}
 customElements.define('library-container-card', LibraryContainerCard);

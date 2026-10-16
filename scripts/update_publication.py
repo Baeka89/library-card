@@ -49,8 +49,8 @@ import zipfile
 
 
 REPO = 'Baeka89/library-card'
-BASE = 'b8191075b8754243fae6664b337e4db3b1f2019e'
-VERSION = '1.0.0'
+BASE = 'eadf38532c6680805e2efeec6163e85a641b8b09'
+VERSION = '1.1.0'
 TAG = 'v' + VERSION
 MARKER = 'reviewed-release-' + TAG + '.json'
 KNOWN_PREPARED_HASHES = {}
@@ -352,7 +352,7 @@ def publish_release(root, sha, user):
     if target_commit()!=sha:raise UpdateError('GitHub-Tag entspricht nicht dem geprüften Commit.')
     release=find_release()
     if release is None:
-        release=api(f'repos/{REPO}/releases',data={'tag_name':TAG,'target_commitish':sha,'name':TAG+' – YAML-Ausgabe und vorbereitete Popups','body':(root/'RELEASE-NOTES.md').read_text(encoding='utf-8'),'draft':True,'prerelease':False})
+        release=api(f'repos/{REPO}/releases',data={'tag_name':TAG,'target_commitish':sha,'name':TAG+' – Vorhandene Button Cards übernehmen','body':(root/'RELEASE-NOTES.md').read_text(encoding='utf-8'),'draft':True,'prerelease':False})
     identifier=validate_release(release)
     expected_body=(root/'RELEASE-NOTES.md').read_text(encoding='utf-8')
     if 'body' in release and release['body']!=expected_body:raise UpdateError('Der vorhandene Release-Text weicht vom geprüften Changelog ab. Kein automatisches Überschreiben.')
@@ -420,7 +420,7 @@ def preserve_release_outputs(root):
 
 
 def validate_remote_versions():
-    baseline = (0, 5, 2)
+    baseline = (1, 0, 0)
     page = 1
     while True:
         releases = api(f'repos/{REPO}/releases?per_page=100&page={page}')
@@ -460,7 +460,7 @@ def main(argv=None):
         metadata=api(f'repos/{REPO}')
         validate_remote_versions()
         latest=api(f'repos/{REPO}/releases/latest',missing=True)
-        if latest and latest.get('tag_name') not in ('v0.5.2',TAG):raise UpdateError('Das aktuelle öffentliche Release ist '+str(latest.get('tag_name'))+'. Version vor Veröffentlichung neu abgleichen.')
+        if latest and latest.get('tag_name') not in ('v1.0.0',TAG):raise UpdateError('Das aktuelle öffentliche Release ist '+str(latest.get('tag_name'))+'. Version vor Veröffentlichung neu abgleichen.')
         if metadata.get('private') or metadata.get('archived') or metadata.get('default_branch')!='main':raise UpdateError('Repository muss öffentlich, aktiv und auf main eingestellt sein.')
         head,base=local_plan(root,payload)
         remote_head=api(f'repos/{REPO}/commits/main')['sha']
@@ -489,7 +489,7 @@ def main(argv=None):
                 if command(['git','config',key],root,True).returncode:
                     run(['git','config',key,user.get('name') or user['login'] if key=='user.name' else f'{user["id"]}+{user["login"]}@users.noreply.github.com'],root)
             run(['git','add','--',*payload],root)
-            if run(['git','diff','--cached','--name-only'],root):run(['git','commit','-m',f'Release {TAG}: YAML export, native popup preload and isolated editors'],root)
+            if run(['git','diff','--cached','--name-only'],root):run(['git','commit','-m',f'Release {TAG}: existing Button Card conversion in the native editor'],root)
             sha=run(['git','rev-parse','HEAD'],root);checkpoint(root,base,commit=sha)
             assert_identity(user);assert_remotes(root);check_target(root,sha,payload)
             current_remote=api(f'repos/{REPO}/commits/main')['sha']

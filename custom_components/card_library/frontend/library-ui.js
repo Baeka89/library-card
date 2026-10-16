@@ -1,4 +1,4 @@
-import {scopeOriginalEditor} from './library-editor-scope.js?v=1.0.0';
+import {scopeOriginalEditor} from './library-editor-scope.js?v=1.1.0';
 // Home Assistant components provide the controls; CSS only arranges library-owned content.
 export const css = `
 :host{display:block;color:var(--primary-text-color);font-family:var(--ha-font-family-body,Roboto,Noto,sans-serif);--library-line:var(--divider-color);--library-muted:var(--secondary-text-color);--library-accent:var(--primary-color)}

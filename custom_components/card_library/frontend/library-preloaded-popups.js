@@ -1,6 +1,6 @@
-import {clone, getAt, resolveTemplate, popupTemplateRoutes, inputErrors} from './library-core.js?v=1.0.0';
-import {createRenderedCard} from './library-ha-ui.js?v=1.0.0';
-import {retainBubblePopup} from './library-bubble-preload.js?v=1.0.0';
+import {clone, getAt, resolveTemplate, popupTemplateRoutes, inputErrors} from './library-core.js?v=1.1.0';
+import {createRenderedCard} from './library-ha-ui.js?v=1.1.0';
+import {retainBubblePopup} from './library-bubble-preload.js?v=1.1.0';
 
 // The lazy controller stays authoritative for ordinary popups. Only explicitly
 // selected variants acquire connected native instances in this browser session.

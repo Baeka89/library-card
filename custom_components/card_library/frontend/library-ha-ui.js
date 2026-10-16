@@ -1,4 +1,4 @@
-import {refreshEditorScope} from './library-editor-scope.js?v=1.0.0';
+import {refreshEditorScope} from './library-editor-scope.js?v=1.1.0';
 
 // Built-in choices do not depend on window.customCards or a preloaded HA picker.
 export const STANDARD_CARDS = [

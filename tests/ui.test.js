@@ -1579,3 +1579,222 @@ test('saved hash preload exceptions can inherit or disable central preloading', 
   assert.equal(Object.hasOwn(inherited,'preload'),false);assert.equal(manager.draft.templates.calendar.preload,true);
   assert.deepEqual(inherited.overrides,[{path:['layout'],value:'agenda'}]);
 });
+
+const converterValues = {
+  entity_cover:'cover.rolllade_kuchenfenster_3',
+  entity_modus:'sensor.rollladen_modus_kuchenfenster',
+  entity_beschattung:'sensor.rollladen_beschattung_modus_kuchenfenster',
+  entity_override_auto:'input_boolean.rollladen_modus_override_kuchenfenster',
+  entity_override_besch:'input_boolean.rollladen_beschattung_modus_override_kuchenfenster',
+  friendly_name:'Küchenfenster', nav_anchor:'rolllade_kuchenfenster_info'
+};
+const {configurationYaml:buttonConverterYaml}=await import('../custom_components/card_library/frontend/library-tools.js');
+function converterLibrary() {
+  const state=library();
+  state.templates.calendar={name:'Rollladen',bindings:[],config:{
+    type:'custom:button-card',show_state:false,show_label:true,
+    variables:{...converterValues,entity_cover:'cover.central',friendly_name:'Zentral',nav_anchor:'central_info',central_only:'Verknüpft'},
+    styles:{card:[{background:'var(--card-background-color)'}]},
+    tap_action:{action:'navigate',navigation_path:'[[[ return "#" + variables.nav_anchor; ]]]'},
+    custom_fields:{position:'[[[ return states[variables.entity_cover]?.state; ]]]'}
+  }};
+  return state;
+}
+function converterSource(extra={}) {
+  return {type:'custom:button-card',template:'rolladen_karte',variables:structuredClone(converterValues),...extra};
+}
+function setupConverter(options={}) {
+  const state=options.state || converterLibrary();
+  const context=setup(state);
+  const messages=[],events=[];
+  let parsed=options.parsed || converterSource();
+  context.hass.callWS=async message=>{
+    messages.push(structuredClone(message));
+    assert.equal(message.type,'card_library/parse_card','converter must only parse, never save or write dashboards');
+    return structuredClone(parsed);
+  };
+  const editor=document.createElement('library-card-editor');
+  editor.setConfig({type:'custom:library-card',template:'calendar',...options.reference});
+  editor.hass=context.hass;
+  editor.addEventListener('config-changed',event=>events.push(structuredClone(event.detail.config)));
+  const section=openSection(editor.shadowRoot,'Vorhandene Button Card übernehmen');
+  const source=inputField(section,'Bisherige Kartenkonfiguration (YAML)');
+  source.value=buttonConverterYaml(parsed);source.oninput();
+  return {...context,state,editor,section,source,messages,events,setParsed:value=>{parsed=value;}};
+}
+function converterPanel(editor) { return openSection(editor.shadowRoot,'Vorhandene Button Card übernehmen'); }
+function converterApply(section) { return find(section,'Für diese Karte übernehmen').click(); }
+
+test('button-card converter is offered only for a selected button-card template',()=>{
+  const {hass}=setup();const editor=document.createElement('library-card-editor');editor.setConfig({type:'custom:library-card',template:'calendar'});editor.hass=hass;
+  assert.ok(!nodes(editor.shadowRoot).some(node=>node.textContent==='Vorhandene Button Card übernehmen'));
+  const converted=setupConverter();assert.ok(converted.section);
+  converted.editor.setConfig({type:'custom:library-card',template:''});
+  assert.ok(!nodes(converted.editor.shadowRoot).some(node=>node.textContent==='Vorhandene Button Card übernehmen'));
+});
+
+test('typing old button YAML creates no local configuration event or write',()=>{
+  const {editor,source,messages,events}=setupConverter();
+  assert.equal(editor.converterDraft.text,source.value);assert.equal(events.length,0);assert.equal(messages.length,0);
+  assert.equal(editor.config.overrides,undefined);assert.equal(inputField(converterPanel(editor),'Neue Vorlagenkarte (YAML)').value,'');
+  assert.equal(find(converterPanel(editor),'Neuen YAML-Code kopieren').disabled,true);
+});
+
+test('converter imports all seven existing values into one linked HA configuration event',async()=>{
+  const {editor,section,source,state,messages,events,saved}=setupConverter();const original=structuredClone(state);
+  await converterApply(section);
+  const {resolveTemplate}=await import('../custom_components/card_library/frontend/library-core.js');
+  const resolved=resolveTemplate(editor.state.library,'calendar',editor.config.overrides);
+  for(const [key,value] of Object.entries(converterValues))assert.equal(resolved.variables[key],value,key);
+  assert.equal(editor.config.type,'custom:library-card');assert.equal(editor.config.template,'calendar');
+  assert.equal(resolved.template,undefined);assert.ok(!editor.config.overrides.some(override=>override.path[0]==='template'));
+  assert.deepEqual(editor.state.library,original);assert.deepEqual(state,original);assert.equal(saved.length,0);
+  assert.equal(events.length,1);assert.deepEqual(events[0],editor.config);assert.equal(messages.length,1);assert.equal(messages[0].yaml,source.value);
+  assert.equal(editor.converterDraft.accepted,true);assert.equal(converterPanel(editor).open,true);
+});
+
+test('converted reference YAML is complete and readonly with native textarea support',async()=>{
+  const {editor,section}=setupConverter({reference:{grid_options:{columns:6}}});await converterApply(section);
+  const output=inputField(converterPanel(editor),'Neue Vorlagenkarte (YAML)');
+  const {configurationYaml}=await import('../custom_components/card_library/frontend/library-tools.js');
+  assert.equal(output.value,configurationYaml(editor.config));assert.equal(output.readOnly,true);
+  assert.match(output.value,/custom:library-card/);assert.match(output.value,/Küchenfenster/);assert.match(output.value,/grid_options/);
+  assert.ok(!output.value.includes('custom_fields'));assert.ok(!output.value.includes('rolladen_karte'));
+  if(process.env.LIBRARY_NATIVE_UI==='1'){assert.equal(output.tagName,'ha-textarea');assert.equal(output.readonly,true);}
+});
+
+test('converter copies current reference YAML without saving a dashboard or library',async()=>{
+  const {editor,section,messages,events}=setupConverter();await converterApply(section);
+  const previous=Object.getOwnPropertyDescriptor(globalThis,'navigator');let copied;
+  Object.defineProperty(globalThis,'navigator',{configurable:true,value:{clipboard:{writeText:async value=>{copied=value;}}}});
+  try{
+    const panel=converterPanel(editor);await find(panel,'Neuen YAML-Code kopieren').click();
+    assert.equal(copied,inputField(panel,'Neue Vorlagenkarte (YAML)').value);assert.equal(events.length,1);assert.equal(messages.length,1);
+    assert.ok(nodes(panel).some(node=>String(node.textContent).includes('kopiert')));
+  }finally{if(previous)Object.defineProperty(globalThis,'navigator',previous);else delete globalThis.navigator;}
+});
+
+test('converter clipboard failure selects the complete readonly output for manual copy',async()=>{
+  const {editor,section}=setupConverter();await converterApply(section);
+  const panel=converterPanel(editor),output=inputField(panel,'Neue Vorlagenkarte (YAML)');let selected=0;
+  output.select=()=>{selected++;};
+  const previous=Object.getOwnPropertyDescriptor(globalThis,'navigator');
+  Object.defineProperty(globalThis,'navigator',{configurable:true,value:{clipboard:{writeText:async()=>{throw Error('denied');}}}});
+  try{await find(panel,'Neuen YAML-Code kopieren').click();assert.equal(selected,1);assert.ok(output.value.includes('custom:library-card'));assert.ok(nodes(panel).some(node=>String(node.textContent).includes('manuell kopieren')));}
+  finally{if(previous)Object.defineProperty(globalThis,'navigator',previous);else delete globalThis.navigator;}
+});
+
+test('editing imported source clears accepted output without changing the local card',async()=>{
+  const {editor,section,events}=setupConverter();await converterApply(section);const config=structuredClone(editor.config);
+  const panel=converterPanel(editor),source=inputField(panel,'Bisherige Kartenkonfiguration (YAML)');source.value+='\nname: Noch nicht übernommen';source.oninput();
+  assert.equal(editor.converterDraft.accepted,false);assert.equal(inputField(panel,'Neue Vorlagenkarte (YAML)').value,'');
+  assert.equal(find(panel,'Neuen YAML-Code kopieren').disabled,true);assert.deepEqual(editor.config,config);assert.equal(events.length,1);
+});
+
+test('partial button call preserves existing local overrides and inherited central siblings',async()=>{
+  const {editor,section,push,state}=setupConverter({parsed:{type:'custom:button-card',template:'rolladen_karte',variables:{friendly_name:'Küche'}},reference:{overrides:[{path:['show_label'],value:false}]}});
+  await converterApply(section);const {resolveTemplate}=await import('../custom_components/card_library/frontend/library-core.js');
+  let resolved=resolveTemplate(editor.state.library,'calendar',editor.config.overrides);
+  assert.equal(resolved.variables.friendly_name,'Küche');assert.equal(resolved.variables.entity_cover,'cover.central');assert.equal(resolved.variables.central_only,'Verknüpft');assert.equal(resolved.show_label,false);
+  assert.deepEqual(resolved.styles,state.templates.calendar.config.styles);assert.deepEqual(resolved.custom_fields,state.templates.calendar.config.custom_fields);
+  assert.ok(!editor.config.overrides.some(override=>override.remove));
+  const changed=structuredClone(state);changed.templates.calendar.config.custom_fields.position='Neue zentrale Logik';changed.templates.calendar.config.variables.central_only='Neu';push(changed);
+  resolved=resolveTemplate(editor.state.library,'calendar',editor.config.overrides);assert.equal(resolved.custom_fields.position,'Neue zentrale Logik');assert.equal(resolved.variables.central_only,'Neu');assert.equal(resolved.variables.friendly_name,'Küche');
+});
+
+test('converter keeps new-card placement and moves old dashboard placement onto the reference',async()=>{
+  const placement={grid_options:{columns:6,rows:'auto'},layout_options:{grid_columns:2},view_layout:{grid_area:'kitchen'},visibility:[{condition:'user',users:['kitchen-user']}]};
+  const {editor,section}=setupConverter({parsed:converterSource(placement),reference:{grid_options:{columns:12},theme:'Existing Theme',popup_content:'auto'}});
+  await converterApply(section);
+  for(const [key,value] of Object.entries(placement)){assert.deepEqual(editor.config[key],value,key);assert.ok(!editor.config.overrides.some(override=>override.path[0]===key),key+' belongs to the wrapper');}
+  assert.equal(editor.config.theme,'Existing Theme');assert.equal(editor.config.popup_content,'auto');
+});
+
+test('converter uses the explicitly selected library template without creating a second template',async()=>{
+  const state=converterLibrary();state.templates.rolladen_karte={name:'Andere Vorlage',config:{type:'custom:button-card',variables:{friendly_name:'Falsch'}},bindings:[]};
+  const {editor,section}=setupConverter({state});await converterApply(section);
+  assert.equal(editor.config.template,'calendar');assert.deepEqual(Object.keys(editor.state.library.templates),['calendar','rolladen_karte']);
+});
+
+test('successful conversion refreshes original editor and visible variable fields',async()=>{
+  const {editor,section}=setupConverter();openSection(editor.shadowRoot,'Örtliche Anpassungen');await settle();const native=editor.editor;assert.ok(native);
+  await converterApply(section);await settle();assert.equal(editor.editor,native);assert.equal(editor.editor.config.variables.friendly_name,'Küchenfenster');assert.equal(editor.editor.config.variables.entity_cover,converterValues.entity_cover);
+  assert.equal(inputField(editor.shadowRoot,'Anzeigename').value,'Küchenfenster');assert.equal(inputField(editor.shadowRoot,'Rollladen').value,converterValues.entity_cover);
+  assert.equal(inputField(editor.shadowRoot,'Popup-Hash ohne #').value,converterValues.nav_anchor);
+});
+
+test('invalid or empty pasted YAML leaves local configuration and library unchanged',async()=>{
+  const {editor,section,source,hass,messages,events}=setupConverter();const before=structuredClone(editor.config),libraryBefore=structuredClone(editor.state.library);
+  source.value='   ';source.oninput();await converterApply(section);assert.equal(messages.length,0);assert.equal(events.length,0);
+  source.value='type: [';source.oninput();hass.callWS=async()=>{throw Error('Ungültiges Karten-YAML');};await converterApply(section);
+  assert.deepEqual(editor.config,before);assert.deepEqual(editor.state.library,libraryBefore);assert.equal(events.length,0);assert.ok(nodes(section).some(node=>String(node.textContent).includes('Ungültiges Karten-YAML')));
+});
+
+test('wrong pasted card type is rejected before changing the selected reference',async()=>{
+  const {editor,section,events}=setupConverter({parsed:{type:'markdown',content:'Andere Karte'}});const before=structuredClone(editor.config);await converterApply(section);
+  assert.deepEqual(editor.config,before);assert.equal(events.length,0);assert.equal(editor.converterDraft.accepted,false);
+});
+
+test('converter rejects a pending result after local card changes',async()=>{
+  const {editor,section,hass,events}=setupConverter();let release;hass.callWS=()=>new Promise(resolve=>{release=resolve;});const pending=converterApply(section);
+  editor.config.overrides=[{path:['show_label'],value:false}];release(converterSource());await pending;
+  assert.deepEqual(editor.config.overrides,[{path:['show_label'],value:false}]);assert.equal(events.length,0);assert.ok(nodes(section).some(node=>String(node.textContent).includes('inzwischen geändert')));
+});
+
+test('converter rejects a pending result after pasted source changes',async()=>{
+  const {editor,section,source,hass,events}=setupConverter();let release;hass.callWS=()=>new Promise(resolve=>{release=resolve;});const pending=converterApply(section);
+  source.value+='\nname: Neuer Entwurf';source.oninput();release(converterSource());await pending;
+  assert.equal(editor.config.overrides,undefined);assert.equal(events.length,0);assert.equal(editor.converterDraft.text,source.value);assert.ok(nodes(section).some(node=>String(node.textContent).includes('inzwischen geändert')));
+});
+
+test('converter discards pending conversion after template selection changes',async()=>{
+  const state=converterLibrary();state.templates.other={name:'Andere',config:{type:'custom:button-card',variables:{friendly_name:'Andere'}},bindings:[]};
+  const {editor,section,hass,events}=setupConverter({state});let release;hass.callWS=()=>new Promise(resolve=>{release=resolve;});const pending=converterApply(section);
+  editor.setConfig({type:'custom:library-card',template:'other'});release(converterSource());await pending;
+  assert.equal(editor.config.template,'other');assert.equal(editor.config.overrides,undefined);assert.equal(events.length,0);assert.ok(!editor.converterDraft?.text);assert.ok(!editor.converterDraft?.accepted);
+});
+
+test('converter discards pending conversion after the selected central template changes',async()=>{
+  const {editor,section,hass,events,push,state}=setupConverter();let release;hass.callWS=()=>new Promise(resolve=>{release=resolve;});const pending=converterApply(section);
+  const changed=structuredClone(state);changed.templates.calendar.config.show_state=true;push(changed);release(converterSource());await pending;
+  assert.equal(editor.config.overrides,undefined);assert.equal(events.length,0);assert.equal(editor.converterDraft.accepted,false);
+});
+
+test('converter discards pending conversion after a selected shared binding changes',async()=>{
+  const state=converterLibrary();state.groups.color={value:'#112233'};state.templates.calendar.config.color='#112233';state.templates.calendar.bindings=[{path:['color'],group:'color'}];
+  const {editor,section,hass,events,push}=setupConverter({state});let release;hass.callWS=()=>new Promise(resolve=>{release=resolve;});const pending=converterApply(section);
+  const changed=structuredClone(state);changed.groups.color.value='#445566';push(changed);release(converterSource());await pending;
+  assert.equal(editor.config.overrides,undefined);assert.equal(events.length,0);
+});
+
+test('converter discards pending conversion after its editor disconnects',async()=>{
+  const {editor,section,hass,events}=setupConverter();let release;hass.callWS=()=>new Promise(resolve=>{release=resolve;});const pending=converterApply(section);
+  editor.disconnectedCallback();release(converterSource());await pending;assert.equal(editor.config.overrides,undefined);assert.equal(events.length,0);
+});
+
+test('converter discards pending conversion after the HA connection changes',async()=>{
+  const {editor,section,hass,events}=setupConverter();let release;hass.callWS=()=>new Promise(resolve=>{release=resolve;});const pending=converterApply(section);
+  const replacement=setup(converterLibrary());editor.hass=replacement.hass;release(converterSource());await pending;
+  assert.equal(editor.config.overrides,undefined);assert.equal(events.length,0);assert.equal(editor._connection,replacement.hass.connection);
+});
+
+test('unrelated library updates do not cancel a valid pending button conversion',async()=>{
+  const state=converterLibrary();state.templates.other={name:'Unrelated',config:{type:'markdown',content:'Previous'},bindings:[]};
+  const {editor,section,hass,events,push}=setupConverter({state});let release;hass.callWS=()=>new Promise(resolve=>{release=resolve;});const pending=converterApply(section);
+  const changed=structuredClone(state);changed.templates.other.config.content='Updated unrelated card';push(changed);release(converterSource());await pending;
+  assert.equal(events.length,1);assert.equal(editor.converterDraft.accepted,true);
+});
+
+test('unaccepted converter YAML survives selected and unrelated library rerenders',()=>{
+  const {editor,source,push,state}=setupConverter();const text=source.value;
+  const changed=structuredClone(state);changed.templates.calendar.config.show_state=true;push(changed);
+  assert.equal(inputField(converterPanel(editor),'Bisherige Kartenkonfiguration (YAML)').value,text);assert.equal(editor.converterDraft.accepted,false);
+  const unrelated=structuredClone(changed);unrelated.templates.other={name:'Andere',config:{type:'markdown',content:'Andere'},bindings:[]};push(unrelated);
+  assert.equal(inputField(converterPanel(editor),'Bisherige Kartenkonfiguration (YAML)').value,text);assert.equal(editor.config.overrides,undefined);
+});
+
+test('resetting local adaptations clears converter draft and accepted YAML',async()=>{
+  const {editor,section}=setupConverter();await converterApply(section);assert.equal(editor.converterDraft.accepted,true);
+  find(editor.shadowRoot,'Lokale Anpassungen zurücksetzen').click();assert.ok(!editor.converterDraft?.text);assert.ok(!editor.converterDraft?.accepted);assert.deepEqual(editor.config.overrides,[]);
+  const panel=converterPanel(editor);assert.equal(inputField(panel,'Bisherige Kartenkonfiguration (YAML)').value,'');assert.equal(inputField(panel,'Neue Vorlagenkarte (YAML)').value,'');assert.equal(find(panel,'Neuen YAML-Code kopieren').disabled,true);
+});

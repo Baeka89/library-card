@@ -1,7 +1,7 @@
-import {confirmAction} from './library-ui.js?v=1.0.0';
-import {clone, getAt, setAt, resolveTemplate, overlap, bindingValue, exportLibrary, importLibrary, changedTemplates, newId} from './library-core.js?v=1.0.0';
-import {scanDashboards, usages, usageSummary, usageLocationUrl, dependencyReport} from './library-tools.js?v=1.0.0';
-import {createRenderedCard} from './library-ha-ui.js?v=1.0.0';
+import {confirmAction} from './library-ui.js?v=1.1.0';
+import {clone, getAt, setAt, resolveTemplate, overlap, bindingValue, exportLibrary, importLibrary, changedTemplates, newId} from './library-core.js?v=1.1.0';
+import {scanDashboards, usages, usageSummary, usageLocationUrl, dependencyReport} from './library-tools.js?v=1.1.0';
+import {createRenderedCard} from './library-ha-ui.js?v=1.1.0';
 
 export function installTools(Manager, {el, field, button, select, tree, whenOpen}) {
   Object.assign(Manager.prototype, {

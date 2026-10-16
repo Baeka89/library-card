@@ -1,5 +1,5 @@
-import {clone, getAt, popupTemplateInfo, popupTemplateRoute, resolveTemplate, validateJson, validatePopupContent} from './library-core.js?v=1.0.0';
-import {configurationYaml} from './library-tools.js?v=1.0.0';
+import {clone, getAt, popupTemplateInfo, popupTemplateRoute, resolveTemplate, validateJson, validatePopupContent} from './library-core.js?v=1.1.0';
+import {configurationYaml} from './library-tools.js?v=1.1.0';
 
 function popupOptions(value = {}) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || ['type', 'card_type', 'hash', 'cards'].some(key => Object.hasOwn(value, key))) throw Error('Ungültige Popup-Einstellungen');
@@ -31,7 +31,7 @@ export function templateYamlConfig(library, id, hash = '') {
   return config;
 }
 
-function selectYamlText(text) {
+export function selectYamlText(text) {
   const pending = [text], visited = new Set();
   while (pending.length) {
     const candidate = pending.shift();

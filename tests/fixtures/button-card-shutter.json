@@ -1,0 +1,302 @@
+{
+  "type": "custom:button-card",
+  "show_state": false,
+  "show_label": true,
+  "variables": {
+    "entity_cover": "",
+    "entity_modus": "",
+    "entity_beschattung": "",
+    "entity_override_auto": "",
+    "entity_override_besch": "",
+    "friendly_name": "Fenster",
+    "nav_anchor": "rolllade_info"
+  },
+  "entity": "[[[ return variables.entity_cover; ]]]\n",
+  "triggers_update": [
+    "[[[ return variables.entity_cover; ]]]\n",
+    "[[[ return variables.entity_modus; ]]]\n",
+    "[[[ return variables.entity_beschattung; ]]]\n",
+    "[[[ return variables.entity_override_auto; ]]]\n",
+    "[[[ return variables.entity_override_besch; ]]]\n"
+  ],
+  "name": "[[[\n  var cover = states[variables.entity_cover];\n  var pos = (cover && cover.attributes && cover.attributes.current_position !== undefined) ? cover.attributes.current_position + '%' : '';\n  return variables.friendly_name + (pos ? ' • ' + pos : '');\n]]]\n",
+  "label": "[[[\n  var s_auto = states[variables.entity_modus];\n  var s_besch = states[variables.entity_beschattung];\n  var o_auto = states[variables.entity_override_auto];\n  var o_besch = states[variables.entity_override_besch];\n\n  var is_auto = s_auto && s_auto.state === 'Manuell';\n  var is_besch = s_besch && s_besch.state === 'Manuell';\n\n  if (!is_auto && !is_besch) return 'Vollautomatik';\n\n  var status = [];\n  if (is_auto) {\n    status.push(o_auto && o_auto.state === 'on' ? 'Auto AUS (Lokal)' : 'Auto AUS (Global)');\n  }\n  if (is_besch) {\n    status.push(o_besch && o_besch.state === 'on' ? 'Beschattung AUS (Lokal)' : 'Beschattung AUS (Global)');\n  }\n  return status.join(' & ');\n]]]\n",
+  "icon": "[[[\n  var cover = states[variables.entity_cover];\n  return (cover && cover.state === 'closed') ? 'mdi:window-shutter' : 'mdi:window-shutter-open';\n]]]\n",
+  "tap_action": {
+    "action": "navigate",
+    "navigation_path": "[[[ return '#' + variables.nav_anchor; ]]]\n"
+  },
+  "styles": {
+    "grid": [
+      {
+        "grid-template-areas": "\"i n\" \"i l\" \"modes modes\" \"buttons buttons\""
+      },
+      {
+        "grid-template-columns": "44px 1fr"
+      },
+      {
+        "grid-template-rows": "auto auto auto auto"
+      },
+      {
+        "row-gap": "6px"
+      }
+    ],
+    "card": [
+      {
+        "padding": "12px"
+      },
+      {
+        "border-radius": "var(--ha-card-border-radius, 12px)"
+      },
+      {
+        "border": "[[[\n  var s_auto = states[variables.entity_modus];\n  var s_besch = states[variables.entity_beschattung];\n  var any = (s_auto && s_auto.state === 'Manuell') || (s_besch && s_besch.state === 'Manuell');\n  return !any ? '2px solid red' : '1px solid var(--ha-card-border-color, var(--divider-color))';\n]]]\n"
+      },
+      {
+        "cursor": "pointer"
+      }
+    ],
+    "img_cell": [
+      {
+        "background-color": "[[[\n  var s_auto = states[variables.entity_modus];\n  var s_besch = states[variables.entity_beschattung];\n  var any = (s_auto && s_auto.state === 'Manuell') || (s_besch && s_besch.state === 'Manuell');\n  if (!any) return 'rgba(244, 67, 54, 0.1)';\n  var cover = states[variables.entity_cover];\n  return (cover && cover.state === 'closed') ? 'rgba(150, 150, 150, 0.1)' : 'rgba(33, 150, 243, 0.15)';\n]]]\n"
+      },
+      {
+        "border-radius": "50%"
+      },
+      {
+        "width": "40px"
+      },
+      {
+        "height": "40px"
+      },
+      {
+        "justify-self": "start"
+      },
+      {
+        "align-self": "center"
+      }
+    ],
+    "icon": [
+      {
+        "width": "22px"
+      },
+      {
+        "height": "22px"
+      },
+      {
+        "color": "[[[\n  var s_auto = states[variables.entity_modus];\n  var s_besch = states[variables.entity_beschattung];\n  var any = (s_auto && s_auto.state === 'Manuell') || (s_besch && s_besch.state === 'Manuell');\n  if (!any) return 'var(--error-color, #f44336)';\n  var cover = states[variables.entity_cover];\n  return (cover && cover.state === 'closed') ? 'var(--disabled-text-color)' : 'var(--accent-color, #2196f3)';\n]]]\n"
+      }
+    ],
+    "name": [
+      {
+        "justify-self": "start"
+      },
+      {
+        "font-weight": 500
+      },
+      {
+        "font-size": "14px"
+      },
+      {
+        "align-self": "end"
+      },
+      {
+        "padding-left": "8px"
+      }
+    ],
+    "label": [
+      {
+        "justify-self": "start"
+      },
+      {
+        "font-size": "12px"
+      },
+      {
+        "opacity": 0.6
+      },
+      {
+        "align-self": "start"
+      },
+      {
+        "padding-left": "8px"
+      }
+    ],
+    "custom_fields": {
+      "buttons": [
+        {
+          "margin-top": "4px"
+        },
+        {
+          "opacity": "[[[\n  var s_auto = states[variables.entity_modus];\n  var s_besch = states[variables.entity_beschattung];\n  return (s_auto && s_auto.state === 'Manuell') || (s_besch && s_besch.state === 'Manuell') ? '1' : '0.4';\n]]]\n"
+        },
+        {
+          "pointer-events": "[[[\n  var s_auto = states[variables.entity_modus];\n  var s_besch = states[variables.entity_beschattung];\n  return (s_auto && s_auto.state === 'Manuell') || (s_besch && s_besch.state === 'Manuell') ? 'auto' : 'none';\n]]]\n"
+        }
+      ]
+    }
+  },
+  "custom_fields": {
+    "modes": {
+      "card": {
+        "type": "horizontal-stack",
+        "cards": [
+          {
+            "type": "custom:button-card",
+            "entity": "[[[ return variables.entity_override_auto; ]]]\n",
+            "name": "Auto Aus",
+            "show_icon": false,
+            "tap_action": {
+              "action": "toggle"
+            },
+            "styles": {
+              "card": [
+                {
+                  "height": "28px"
+                },
+                {
+                  "border-radius": "20px"
+                },
+                {
+                  "font-size": "11px"
+                },
+                {
+                  "font-weight": 500
+                },
+                {
+                  "background-color": "[[[\n  var s = states[variables.entity_override_auto];\n  return (s && s.state === 'on') ? 'rgba(244, 67, 54, 0.2)' : 'var(--secondary-background-color)';\n]]]\n"
+                },
+                {
+                  "border": "[[[\n  var s = states[variables.entity_override_auto];\n  return (s && s.state === 'on') ? '1px solid #f44336' : '1px solid transparent';\n]]]\n"
+                },
+                {
+                  "color": "[[[\n  var s = states[variables.entity_override_auto];\n  return (s && s.state === 'on') ? '#f44336' : 'var(--primary-text-color)';\n]]]\n"
+                }
+              ]
+            }
+          },
+          {
+            "type": "custom:button-card",
+            "entity": "[[[ return variables.entity_override_besch; ]]]\n",
+            "name": "Beschattung Aus",
+            "show_icon": false,
+            "tap_action": {
+              "action": "toggle"
+            },
+            "styles": {
+              "card": [
+                {
+                  "height": "28px"
+                },
+                {
+                  "border-radius": "20px"
+                },
+                {
+                  "font-size": "11px"
+                },
+                {
+                  "font-weight": 500
+                },
+                {
+                  "background-color": "[[[\n  var s = states[variables.entity_override_besch];\n  return (s && s.state === 'on') ? 'rgba(255, 152, 0, 0.2)' : 'var(--secondary-background-color)';\n]]]\n"
+                },
+                {
+                  "border": "[[[\n  var s = states[variables.entity_override_besch];\n  return (s && s.state === 'on') ? '1px solid #ff9800' : '1px solid transparent';\n]]]\n"
+                },
+                {
+                  "color": "[[[\n  var s = states[variables.entity_override_besch];\n  return (s && s.state === 'on') ? '#ff9800' : 'var(--primary-text-color)';\n]]]\n"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "buttons": {
+      "card": {
+        "type": "horizontal-stack",
+        "cards": [
+          {
+            "type": "custom:button-card",
+            "icon": "mdi:arrow-up",
+            "tap_action": {
+              "action": "[[[\n  var s_auto = states[variables.entity_modus];\n  var s_besch = states[variables.entity_beschattung];\n  var enabled = (s_auto && s_auto.state === 'Manuell') || (s_besch && s_besch.state === 'Manuell');\n  return enabled ? 'call-service' : 'none';\n]]]\n",
+              "service": "cover.open_cover",
+              "target": {
+                "entity_id": "[[[ return variables.entity_cover; ]]]\n"
+              }
+            },
+            "styles": {
+              "card": [
+                {
+                  "background-color": "var(--secondary-background-color)"
+                },
+                {
+                  "border-radius": "10px"
+                },
+                {
+                  "height": "38px"
+                },
+                {
+                  "box-shadow": "none"
+                }
+              ]
+            }
+          },
+          {
+            "type": "custom:button-card",
+            "icon": "mdi:stop",
+            "tap_action": {
+              "action": "[[[\n  var s_auto = states[variables.entity_modus];\n  var s_besch = states[variables.entity_beschattung];\n  var enabled = (s_auto && s_auto.state === 'Manuell') || (s_besch && s_besch.state === 'Manuell');\n  return enabled ? 'call-service' : 'none';\n]]]\n",
+              "service": "cover.stop_cover",
+              "target": {
+                "entity_id": "[[[ return variables.entity_cover; ]]]\n"
+              }
+            },
+            "styles": {
+              "card": [
+                {
+                  "background-color": "var(--secondary-background-color)"
+                },
+                {
+                  "border-radius": "10px"
+                },
+                {
+                  "height": "38px"
+                },
+                {
+                  "box-shadow": "none"
+                }
+              ]
+            }
+          },
+          {
+            "type": "custom:button-card",
+            "icon": "mdi:arrow-down",
+            "tap_action": {
+              "action": "[[[\n  var s_auto = states[variables.entity_modus];\n  var s_besch = states[variables.entity_beschattung];\n  var enabled = (s_auto && s_auto.state === 'Manuell') || (s_besch && s_besch.state === 'Manuell');\n  return enabled ? 'call-service' : 'none';\n]]]\n",
+              "service": "cover.close_cover",
+              "target": {
+                "entity_id": "[[[ return variables.entity_cover; ]]]\n"
+              }
+            },
+            "styles": {
+              "card": [
+                {
+                  "background-color": "var(--secondary-background-color)"
+                },
+                {
+                  "border-radius": "10px"
+                },
+                {
+                  "height": "38px"
+                },
+                {
+                  "box-shadow": "none"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

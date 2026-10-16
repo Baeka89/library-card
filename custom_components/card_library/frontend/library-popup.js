@@ -1,6 +1,6 @@
-import {withPreloadedPopups} from './library-preloaded-popups.js?v=1.0.0';
-import {clone, validateJson, validatePopupRoutes, validatePopupContent, popupTemplateInfo, popupTemplateRoutes, getAt, resolveTemplate, inputErrors} from './library-core.js?v=1.0.0';
-import {createRenderedCard} from './library-ha-ui.js?v=1.0.0';
+import {withPreloadedPopups} from './library-preloaded-popups.js?v=1.1.0';
+import {clone, validateJson, validatePopupRoutes, validatePopupContent, popupTemplateInfo, popupTemplateRoutes, getAt, resolveTemplate, inputErrors} from './library-core.js?v=1.1.0';
+import {createRenderedCard} from './library-ha-ui.js?v=1.1.0';
 
 export function bubblePopupConfig(action, hash, templateConfig) {
   validateJson(action);

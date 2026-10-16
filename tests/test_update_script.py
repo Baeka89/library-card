@@ -92,7 +92,7 @@ class UpdateScriptTest(unittest.TestCase):
         return contents
 
     def test_reviewed_public_baseline_is_fixed(self):
-        self.assertEqual(updater.BASE, "b8191075b8754243fae6664b337e4db3b1f2019e")
+        self.assertEqual(updater.BASE, "eadf38532c6680805e2efeec6163e85a641b8b09")
 
     def test_payload_integrity_and_versions_are_checked(self):
         payload = fixture_files()
@@ -343,9 +343,9 @@ if __name__ == "__main__":
 
 class RemoteVersionTest(unittest.TestCase):
     def test_all_published_numeric_versions_are_checked_without_reusing_historical_local_versions(self):
-        previous=[{'tag_name':'v0.5.2','draft':False},{'tag_name':'v0.5.1','draft':False},{'tag_name':'v9.0.0','draft':True}]
+        previous=[{'tag_name':'v1.0.0','draft':False},{'tag_name':'v0.5.1','draft':False},{'tag_name':'v9.0.0','draft':True}]
         with patch.object(updater,'api',return_value=previous):updater.validate_remote_versions()
-        with patch.object(updater,'api',return_value=[{'tag_name':'v2.0.0','draft':False}]),self.assertRaisesRegex(updater.UpdateError,'Weitere Veröffentlichung'):updater.validate_remote_versions()
+        with patch.object(updater,'api',return_value=[{'tag_name':'v3.0.0','draft':False}]),self.assertRaisesRegex(updater.UpdateError,'Weitere Veröffentlichung'):updater.validate_remote_versions()
     def test_divergent_release_notes_cannot_be_published_from_an_existing_draft(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);(root/'RELEASE-NOTES.md').write_text('Reviewed',encoding='utf-8')
