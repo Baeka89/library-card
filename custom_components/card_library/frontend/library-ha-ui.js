@@ -1,3 +1,5 @@
+import {refreshEditorScope} from './library-editor-scope.js?v=1.0.0';
+
 // Built-in choices do not depend on window.customCards or a preloaded HA picker.
 export const STANDARD_CARDS = [
   ['horizontal-stack','Horizontaler Stapel'],['vertical-stack','Vertikaler Stapel'],['grid','Raster'],
@@ -130,4 +132,5 @@ export function updateOriginalEditor(editor, cache, hass, config, lovelace) {
       else editor.value = structuredClone(config);
     } catch (error) { cache.signature = previous; throw error; }
   }
+  refreshEditorScope(editor);
 }

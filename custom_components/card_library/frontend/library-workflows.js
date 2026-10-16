@@ -1,7 +1,7 @@
-import {clone,getAt,overlap,resolveTemplate,newId,validateInputDefinitions,inputErrors,dependencies,importLibrary,popupTemplateRoutes,changedTemplates} from './library-core.js?v=0.5.2';
-import {usages,configurationYaml} from './library-tools.js?v=0.5.2';
-import {createRenderedCard} from './library-ha-ui.js?v=0.5.2';
-import {confirmAction} from './library-ui.js?v=0.5.2';
+import {clone,getAt,overlap,resolveTemplate,newId,validateInputDefinitions,inputErrors,dependencies,importLibrary,popupTemplateRoutes,changedTemplates} from './library-core.js?v=1.0.0';
+import {usages,configurationYaml} from './library-tools.js?v=1.0.0';
+import {createRenderedCard} from './library-ha-ui.js?v=1.0.0';
+import {confirmAction} from './library-ui.js?v=1.0.0';
 
 export function canonical(value) {
   if (value === undefined) return 'undefined';

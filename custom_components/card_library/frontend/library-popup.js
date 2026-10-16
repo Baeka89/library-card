@@ -1,5 +1,6 @@
-import {clone, validateJson, validatePopupRoutes, validatePopupContent, popupTemplateInfo, popupTemplateRoutes, getAt, resolveTemplate, inputErrors} from './library-core.js?v=0.5.2';
-import {createRenderedCard} from './library-ha-ui.js?v=0.5.2';
+import {withPreloadedPopups} from './library-preloaded-popups.js?v=1.0.0';
+import {clone, validateJson, validatePopupRoutes, validatePopupContent, popupTemplateInfo, popupTemplateRoutes, getAt, resolveTemplate, inputErrors} from './library-core.js?v=1.0.0';
+import {createRenderedCard} from './library-ha-ui.js?v=1.0.0';
 
 export function bubblePopupConfig(action, hash, templateConfig) {
   validateJson(action);
@@ -21,7 +22,7 @@ export function bubblePopupConfig(action, hash, templateConfig) {
 
 // One HA state recipient per application, never one recipient per popup.
 // provideHass retains its recipients, so the host intentionally survives closes.
-export function createPopupController(env, validateReference = () => {}, currentReference) {
+function createLazyPopupController(env, validateReference = () => {}, currentReference) {
   let host, app, active, generation = 0, sequence = 0, manualRefresh = 0, onHass, connection, pendingTeardown, libraryState;
   const inheritedAction = action => ({...action,popup:{...(libraryState?.templates?.[action.template]?.popup?.options || {}),...(action.popup || {})}});
   const navigationIdentity = () => JSON.stringify([env.window.location.pathname, env.window.location.hash]);
@@ -296,6 +297,10 @@ export function createPopupController(env, validateReference = () => {}, current
     }};
 }
 
+export function createPopupController(env, validateReference = () => {}, currentReference) {
+  return withPreloadedPopups(env,createLazyPopupController(env,validateReference,currentReference),bubblePopupConfig,validateReference);
+}
+
 export function createPopupHashRouter(env, controller, reportError = () => {}) {
   let routes = new Map(), nativeFrames = new Map(), libraryState, requestKey = null, requestContentKey, requestApp, ownedHash = null;
   function sync() {
@@ -352,7 +357,7 @@ export function createPopupHashRouter(env, controller, reportError = () => {}) {
   }
   for (const event of ['location-changed', 'hashchange', 'popstate', 'bubble-card-location-changed']) env.window.addEventListener(event, sync);
   env.window.addEventListener('pagehide', () => { requestKey = null; });
-  env.window.addEventListener('pageshow', sync);
+  env.window.addEventListener('pageshow', () => {controller.refreshPreloads?.();sync();});
   return {setLibrary(library) {
     libraryState = library;
     nativeFrames.clear();
@@ -369,7 +374,7 @@ export function createPopupHashRouter(env, controller, reportError = () => {}) {
         for (const route of popupTemplateRoutes(library,template)) {
           // Index metadata only. Resolve local exceptions for the selected
           // route; unopened aliases and their configurations are never copied.
-          next.set(route.hash, {native:route.native, action:{action:'popup', template:id, popup:route.options,...(route.overrides === undefined ? {} : {overrides:route.overrides})}});
+          next.set(route.hash, {native:route.native, action:{action:'popup', template:id, popup:route.options, preload:route.preload,...(route.overrides === undefined ? {} : {overrides:route.overrides})}});
         }
       }
     }
@@ -377,7 +382,7 @@ export function createPopupHashRouter(env, controller, reportError = () => {}) {
     controller.setLibrary?.(library);
     if (ownedHash && env.window.location.hash === ownedHash && !routes.has(ownedHash)) controller.close();
     sync();
-  }, retry() { requestKey = null; sync(); }};
+  }, retry() { controller.refreshPreloads?.(); requestKey = null; sync(); }};
 }
 
 export function installPopupActions(validateReference, watchLibrary, currentReference) {

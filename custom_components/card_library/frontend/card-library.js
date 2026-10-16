@@ -1,10 +1,11 @@
-import {css, el, field, setSelectOptions, confirmAction, captureDisclosures, mountOriginalEditor, whenOpen, visibleInSections} from './library-ui.js?v=0.5.2';
-import {STANDARD_CARDS, cardConstructor, cachedOriginalEditor, updateOriginalEditor, createRenderedCard} from './library-ha-ui.js?v=0.5.2';
-import {editorOverrides, restoreBindings, updateLocalField, designOverrides, clone, getAt, setAt, resolveTemplate, overlap, bindingValue, newId, validateCard, importLibrary, validatePopupRoutes, popupTemplateInfo, popupTemplateRoute, inputErrors} from './library-core.js?v=0.5.2';
-import {configurationYaml, scanDashboards, usages} from './library-tools.js?v=0.5.2';
-import {installTools} from './library-manager-tools.js?v=0.5.2';
-import {installWorkflows} from './library-workflows.js?v=0.5.2';
-import {installPopupActions} from './library-popup.js?v=0.5.2';
+import {css, el, field, setSelectOptions, confirmAction, captureDisclosures, mountOriginalEditor, whenOpen, visibleInSections} from './library-ui.js?v=1.0.0';
+import {STANDARD_CARDS, cardConstructor, cachedOriginalEditor, updateOriginalEditor, createRenderedCard} from './library-ha-ui.js?v=1.0.0';
+import {editorOverrides, restoreBindings, updateLocalField, designOverrides, clone, getAt, setAt, resolveTemplate, overlap, bindingValue, newId, validateCard, importLibrary, validatePopupRoutes, popupTemplateInfo, popupTemplateRoute, inputErrors} from './library-core.js?v=1.0.0';
+import {configurationYaml, scanDashboards, usages} from './library-tools.js?v=1.0.0';
+import {installTools} from './library-manager-tools.js?v=1.0.0';
+import {installWorkflows} from './library-workflows.js?v=1.0.0';
+import {installYamlTools} from './library-yaml-export.js?v=1.0.0';
+import {installPopupActions} from './library-popup.js?v=1.0.0';
 const clients = new WeakMap();
 // Inspect only requested templates and their actual dependencies. Snapshot data
 // is authoritative; no draft or persistent browser data enters these caches.
@@ -158,6 +159,11 @@ function popupRouteButton(parent, owner, template, library = () => owner.draft) 
 }
 function popupRouteSettings(parent, owner, template) {
   const section = el('details', undefined, parent); el('summary', 'Popup über #Hash öffnen', section);
+  select(section, [['lazy','Beim Öffnen laden'],['warm','Im Hintergrund vorladen und bereithalten']], template.preload ? 'warm' : 'lazy', value => {
+    if (value === 'warm') template.preload = true; else delete template.preload;
+    owner.edit();
+  }, 'Popup laden');
+  el('p', 'Vorladen bereitet den Inhalt in diesem Browser vor und benötigt zusätzlichen Arbeitsspeicher. Unterkarten können eigene Daten weiterhin verzögert laden.', section);
   const native = popupTemplateInfo(template.config);
   if (native?.supported) {
     el('p', 'Hash und Gestaltung im originalen Bubble-Editor bearbeiten und zentral speichern. Der Karten-Hash wird automatisch erkannt.', section);
@@ -248,7 +254,7 @@ function popupUsage(parent, owner, template, overrides = []) {
   const links = (owner.draft || savedLibrary()).templates[template]?.popup_links || [];
   const chosen = select(local,[['','Neue Verknüpfung'],...links.map(link=>[link.hash,link.hash])],owner.popupLinkDraft.previousHash,hash => {
     const link = links.find(entry=>entry.hash===hash);
-    owner.popupLinkDraft = {hash:link?.hash || '',previousHash:link?.hash || ''};
+    owner.popupLinkDraft = {hash:link?.hash || '',previousHash:link?.hash || '',...(typeof link?.preload === 'boolean' ? {preload:link.preload} : {})};
     if (link) {
       owner.bubbleOptions = clone(link.options || {});
       owner.popupLinkOverrides = clone(link.overrides || []);
@@ -258,6 +264,10 @@ function popupUsage(parent, owner, template, overrides = []) {
     }
     owner.render();
   },'Popup-Verknüpfung');
+  select(local, [['inherit','Aus Vorlage übernehmen'],['lazy','Beim Öffnen laden'],['warm','Im Hintergrund vorladen und bereithalten']], typeof owner.popupLinkDraft.preload === 'boolean' ? owner.popupLinkDraft.preload ? 'warm' : 'lazy' : 'inherit', value => {
+    if (value === 'inherit') delete owner.popupLinkDraft.preload; else owner.popupLinkDraft.preload = value === 'warm';
+    update(false);
+  }, 'Ladeverhalten der Hash-Variante');
   const hash = field(local,'Eigener Popup-Hash'); hash.value = owner.popupLinkDraft.hash; hash.placeholder = '#Menu-Wohnzimmer';
   hash.oninput = () => { owner.popupLinkDraft.hash = hash.value; update(false); };
   const title = field(local, 'Popup-Titel');
@@ -270,8 +280,8 @@ function popupUsage(parent, owner, template, overrides = []) {
     return {...(info ? getAt(config,info.path) : {}),...baseOptions()};
   };
   const effectiveOptions = () => ({...baseOptions(),...owner.bubbleOptions});
-  const action = () => ({action:'popup',template,...(currentOverrides().length ? {overrides:clone(currentOverrides())} : {}),popup:clone(owner.bubbleOptions)});
-  const linkValue = () => ({hash:owner.popupLinkDraft.hash.trim(),...(currentOverrides().length ? {overrides:clone(currentOverrides())} : {}),...(Object.keys(owner.bubbleOptions).length ? {options:clone(owner.bubbleOptions)} : {})});
+  const action = () => ({action:'popup',template,...(typeof owner.popupLinkDraft.preload === 'boolean' ? {preload:owner.popupLinkDraft.preload} : {}),...(currentOverrides().length ? {overrides:clone(currentOverrides())} : {}),popup:clone(owner.bubbleOptions)});
+  const linkValue = () => ({hash:owner.popupLinkDraft.hash.trim(),...(typeof owner.popupLinkDraft.preload === 'boolean' ? {preload:owner.popupLinkDraft.preload} : {}),...(currentOverrides().length ? {overrides:clone(currentOverrides())} : {}),...(Object.keys(owner.bubbleOptions).length ? {options:clone(owner.bubbleOptions)} : {})});
   const ownOutput = field(local,'Hash-Button (YAML)','textarea',false); ownOutput.readOnly = true; ownOutput.rows = 8;
   const notice = el('p','',local); notice.className = 'hint';
   let save, remove, preview;
@@ -282,7 +292,7 @@ function popupUsage(parent, owner, template, overrides = []) {
       const defaults = inherited();
       if (values) { title.value = owner.bubbleOptions.name ?? defaults.name ?? ''; width.value = owner.bubbleOptions.width_desktop ?? defaults.width_desktop ?? ''; }
       const value = linkValue(), stored = savedTemplate()?.popup_links?.find(entry=>entry.hash === value.hash);
-      const matches = stored && JSON.stringify(stored.overrides || [])===JSON.stringify(value.overrides || []) && JSON.stringify(stored.options || {})===JSON.stringify(value.options || {});
+      const matches = stored && JSON.stringify(stored.overrides || [])===JSON.stringify(value.overrides || []) && JSON.stringify(stored.options || {})===JSON.stringify(value.options || {}) && stored.preload===value.preload;
       ownOutput.value = matches ? configurationYaml({type:'button',name:effectiveOptions().name || defaults.name || savedTemplate().name,icon:'mdi:open-in-new',tap_action:{action:'navigate',navigation_path:value.hash}}) : '';
       output.value = configurationYaml({type:'button',name:effectiveOptions().name || defaults.name || 'Vorlage öffnen',icon:'mdi:open-in-new',tap_action:{action:'fire-dom-event',card_library:action()}});
       if (!owner.popupLinkSaving) notice.textContent = matches ? 'Gespeichert. Nur diesen Button einsetzen.' : 'Für einen eigenen Hash zuerst die Verknüpfung speichern.';
@@ -905,6 +915,7 @@ class LibraryManager extends Base {
     name.readOnly=Boolean(mode==='templates'&&(item.protected||this.state.library.templates[this.selected]?.protected));
     name.onchange = () => { if(!name.readOnly){item.name = name.value; this.edit();} };
     const itemActions = el('details', undefined, card); itemActions.className = 'item-actions'; el('summary', mode === 'groups' ? 'Einstellungsaktionen' : 'Vorlagenaktionen', itemActions);
+    if (mode === 'templates') this.yamlExportPanel(itemActions, item);
     button(itemActions, 'Löschen', () => this.run(() => this.deleteItem(mode, this.selected))).className = 'danger';
     if (mode === 'groups') {
       el('p', 'Änderungen gelten für alle unten aufgeführten Vorlagen.', card);
@@ -1139,6 +1150,7 @@ class LibraryManager extends Base {
 }
 installTools(LibraryManager, {el, field, button, select, tree, whenOpen});
 installWorkflows(LibraryManager, {el,field,button,select,whenOpen});
+installYamlTools(LibraryManager, {el,field,button,select,whenOpen});
 LibraryEditor.prototype.previewCard = LibraryManager.prototype.previewCard;
 class LibraryManagerEditor extends LibraryManager {}
 customElements.define('library-container-card', LibraryContainerCard);

@@ -1,9 +1,9 @@
 {
   "name": "library-card",
-  "version": "0.5.2",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/core.test.js && node tests/tools.test.js && node tests/workflows.test.js && node tests/ui.test.js && node tests/native-ui.test.js && node tests/resources.test.js && node tests/family-calendar.test.js && node tests/popup.test.js && node tests/popup-resource.test.js"
+    "test": "node tests/core.test.js && node tests/tools.test.js && node tests/workflows.test.js && node tests/ui.test.js && node tests/native-ui.test.js && node tests/resources.test.js && node tests/family-calendar.test.js && node tests/popup.test.js && node tests/popup-resource.test.js && node tests/yaml-export.test.js && node tests/editor-scope.test.js && node tests/preload.test.js"
   }
 }

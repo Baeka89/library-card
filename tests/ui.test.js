@@ -1557,3 +1557,25 @@ test('failed insertion after hash creation reports the preserved alias instead o
   hass.callWS=async message=>message.type==='card_library/dashboard_get'?{mode:'storage',fingerprint:'a'.repeat(64),config:{views:[{cards:[source.config]}]}}:message.type==='card_library/dashboard_write'?Promise.reject(Error('conflict')):original(message);
   await manager.openUsage(source);manager.duplicateHash='#copy';await assert.rejects(()=>manager.duplicateUsage({url_path:'target',path:['views',0,'cards']}),/Hash-Kopie #copy wurde gespeichert/);assert.equal(saved.length,1);assert.equal(manager.localUse.pendingDuplicateHash,'#copy');
 });
+
+test('central popup preload selection persists and can return to lazy loading', async () => {
+  const state=library();state.templates.calendar.config={type:'custom:bubble-card',card_type:'pop-up',hash:'#Menu',cards:[{type:'markdown',content:'Menu'}]};
+  const {manager,saved}=setup(state);manager.selected='calendar';manager.render();
+  const loading=inputField(manager.shadowRoot,'Popup laden');loading.value='warm';loading.onchange();
+  assert.equal(manager.draft.templates.calendar.preload,true);assert.equal(manager.dirty,true);
+  await manager.save();assert.equal(saved.at(-1).library.templates.calendar.preload,true);
+  manager.selected='calendar';manager.render();const reset=inputField(manager.shadowRoot,'Popup laden');reset.value='lazy';reset.onchange();
+  assert.equal(Object.hasOwn(manager.draft.templates.calendar,'preload'),false);
+});
+
+test('saved hash preload exceptions can inherit or disable central preloading', async () => {
+  const state=library();state.templates.calendar.preload=true;state.templates.calendar.popup_links=[{hash:'#Local',preload:false,overrides:[{path:['layout'],value:'agenda'}]}];
+  const {manager}=setup(state);manager.selected='calendar';manager.render();
+  const choose=inputField(manager.shadowRoot,'Popup-Verknüpfung');choose.value='#Local';choose.onchange();
+  assert.equal(inputField(manager.shadowRoot,'Ladeverhalten der Hash-Variante').value,'lazy');
+  const loading=inputField(manager.shadowRoot,'Ladeverhalten der Hash-Variante');loading.value='inherit';loading.onchange();
+  await find(manager.shadowRoot,'Verknüpfung speichern').click();
+  const inherited=manager.draft.templates.calendar.popup_links.find(link=>link.hash==='#Local');
+  assert.equal(Object.hasOwn(inherited,'preload'),false);assert.equal(manager.draft.templates.calendar.preload,true);
+  assert.deepEqual(inherited.overrides,[{path:['layout'],value:'agenda'}]);
+});

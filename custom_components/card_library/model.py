@@ -324,6 +324,8 @@ def validate_library(value):
             raise ValueError("Shared settings need a value")
     popup_hashes = set()
     for item in value["templates"].values():
+        if "preload" in item and not isinstance(item["preload"], bool):
+            raise ValueError("Popup preload must be a boolean")
         config = item.get("config")
         if not isinstance(config, dict) or not has_text(config.get("type")):
             raise ValueError("Template needs a card type")
@@ -379,8 +381,10 @@ def validate_library(value):
         if not isinstance(popup_links, list):
             raise ValueError("Popup links must be a list")
         for link in popup_links:
-            if not isinstance(link, dict) or set(link) - {"hash", "overrides", "options"}:
+            if not isinstance(link, dict) or set(link) - {"hash", "overrides", "options", "preload"}:
                 raise ValueError("Invalid popup link")
+            if "preload" in link and not isinstance(link["preload"], bool):
+                raise ValueError("Popup preload must be a boolean")
             link_hash = link.get("hash")
             validate_popup_hash(link_hash)
             validate_popup_options(link.get("options", {}))

@@ -415,7 +415,7 @@ export function popupTemplateRoute(library, template) {
   const hash = explicit ? template.popup?.hash : info?.hash;
   if (!explicit && (hash === undefined || hash === null || hash === '')) return null;
   if (info && !info.supported) throw Error('Für diese Popup-Vorlage eine eigenständige Bubble-Popup-Karte mit cards oder einen vertical-stack mit Popup-Kopf ohne eigene cards speichern');
-  return {hash, options: explicit ? template.popup?.options ?? {} : {}, native: Boolean(info)};
+  return {hash, options: explicit ? template.popup?.options ?? {} : {}, native: Boolean(info), preload: template.preload === true};
 }
 // Route indexing reads metadata and structural fields only. Local exceptions
 // are applied when that particular alias is selected, never to every saved card.
@@ -423,7 +423,7 @@ export function popupTemplateRoutes(library, template) {
   const base = popupTemplateRoute(library, template);
   return [...(base ? [base] : []), ...(template.popup_links || []).map(link => ({
     hash:link.hash, options:{...(template.popup?.options || {}), ...(link.options || {})},
-    overrides:link.overrides ?? [], native:Boolean(base?.native)
+    overrides:link.overrides ?? [], native:Boolean(base?.native), preload:link.preload ?? template.preload === true
   }))];
 }
 export function validatePopupContent(config) {
@@ -445,6 +445,7 @@ export function validatePopupRoutes(library, resolveLinks = true) {
     validateJson(options);
   }
   for (const [id,template] of Object.entries(library.templates)) {
+    if (Object.hasOwn(template, 'preload') && typeof template.preload !== 'boolean') throw Error('Popup-Vorladen muss ein Wahrheitswert sein');
     if (Object.hasOwn(template, 'popup')) {
       const metadata = template.popup;
       if (!metadata || Array.isArray(metadata) || typeof metadata !== 'object' || Object.keys(metadata).some(key => !['hash', 'options'].includes(key))) throw Error('Ungültige Popup-Zuordnung');
@@ -454,7 +455,8 @@ export function validatePopupRoutes(library, resolveLinks = true) {
       if (!Array.isArray(template.popup_links)) throw Error('Popup-Verknüpfungen müssen eine Liste sein');
       validateJson(template.popup_links);
       for (const link of template.popup_links) {
-        if (!link || typeof link !== 'object' || Array.isArray(link) || !Object.hasOwn(link,'hash') || Object.keys(link).some(key => !['hash','overrides','options'].includes(key))) throw Error('Ungültige Popup-Verknüpfung');
+        if (!link || typeof link !== 'object' || Array.isArray(link) || !Object.hasOwn(link,'hash') || Object.keys(link).some(key => !['hash','overrides','options','preload'].includes(key))) throw Error('Ungültige Popup-Verknüpfung');
+        if (Object.hasOwn(link,'preload') && typeof link.preload !== 'boolean') throw Error('Popup-Vorladen muss ein Wahrheitswert sein');
         if (Object.hasOwn(link,'overrides') && !Array.isArray(link.overrides)) throw Error('Lokale Anpassungen müssen eine Liste sein');
         validateOptions(link.options === undefined ? {} : link.options);
         if (resolveLinks) validatePopupContent(resolveTemplate(library,id,link.overrides ?? []));

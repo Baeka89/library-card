@@ -2,246 +2,157 @@
 
 <p align="center"><img src="custom_components/card_library/brand/icon@2x.png" alt="Library Card" width="160" height="160"></p>
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Baeka89&repository=library-card&category=integration)
+[![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Baeka89&repository=library-card&category=integration)
+[![Release](https://img.shields.io/github/v/release/Baeka89/library-card)](https://github.com/Baeka89/library-card/releases/latest)
 [![Maintainer](https://img.shields.io/badge/Maintainer-Baeka89-blue.svg)](https://github.com/Baeka89)
 [![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://paypal.me/misomazo)
-[![Release](https://img.shields.io/github/v/release/Baeka89/library-card)](https://github.com/Baeka89/library-card/releases/latest)
 
-[Deutsch](#deutsch) | [English](#english) | [Changelog](CHANGELOG.md)
+[Deutsch](#deutsch) | [English](#english)
 
----
+<a id="deutsch"></a>
+## Deutsch
 
-<a name="deutsch"></a>
+### 1. Projekt und Kurzbeschreibung
 
-## Deutsch 🇩🇪
+Library Card verwaltet wiederverwendbare Dashboard-Karten zentral in Home Assistant. Der hier beschriebene Stand ist **v1.0.0**. Karten auf Dashboards bleiben mit ihrer Vorlage verknüpft; lokale Ausnahmen ergänzen diese Vorlage.
 
-### Über dieses Projekt
+### 2. Projektzweck und Funktionsumfang
 
-**Library Card** ist eine zentrale Kartenbibliothek für Home Assistant. Gestalte eine Karte einmal, speichere sie als Vorlage und verwende sie an beliebig vielen Stellen als **Verknüpfung**. Änderungen an der Vorlage werden automatisch auf die verknüpften Karten übertragen; örtliche Ausnahmen bleiben erhalten.
+Zentrale Änderungen erreichen alle verknüpften Verwendungen. Entitäten, Variablen, Layout, Styles, card-mod und Popup-Optionen können örtlich abweichen. Gemeinsame Einstellungen und Personenfarben bleiben zentral. Die Oberfläche trennt „Vorlagen einsetzen“ und „Konfiguration“ und verwendet native HA-Bedienelemente.
 
-Beispiel: Kalender auf dem Dashboard und im Bildschirmschoner zeigen unterschiedliche Informationen, verwenden aber dieselben zentral gepflegten Personenfarben.
+Unterstützt werden Originaleditoren, YAML-Import, JSON-Import/Export, benannte Button-Card-Templates mit statischer Vererbung, Kategorien/Suche, definierte Eingabefelder, Vorlagenschutz, bis zu zehn vorherige Speicherstände, gezielte Rücknahme und Änderungsvorschau. Verwendungen lassen sich ansehen, bearbeiten, vergleichen und duplizieren; die Übersicht nennt Fundstellen und fehlende Entitäten.
 
-Die Integration benötigt Home Assistant **2024.7.0** oder neuer. Das mitgelieferte Logo wird von Home Assistant ab **2026.3** lokal unterstützt; ältere Versionen zeigen gegebenenfalls ein Standardsymbol. Einrichtung und Bibliotheksoberfläche unterstützen Deutsch und Englisch. Fremde Karten behalten ihre eigenen Übersetzungen und Editoren.
+### 3. Systeme, Geräte und Voraussetzungen
 
-### Unterstützte Karten
+Home Assistant **2024.7.0 oder neuer**. Native Karten, installierte Custom Cards sowie vollständige horizontal-stack-, vertical-stack- und grid-Konfigurationen sind verwendbar. Kopf-/Fußzeilen dürfen ein äußeres `card:` und numerisches `max_width:` enthalten. Genutzte Custom Cards und card-mod müssen separat installiert und geladen sein.
 
-* **Home-Assistant-Karten:** integrierte Kartentypen über die HA-Kartenhelfer verwenden.
-* **Installierte Custom Cards:** vorhandene Karten und deren grafische Editoren nutzen, soweit diese einen Editor bereitstellen.
-* **Vollständige Stacks:** beispielsweise `horizontal-stack`, `vertical-stack` und `grid` einschließlich Unterkarten speichern.
-* **Kopf- und Fußzeilen:** Konfigurationen mit `card:` und optionalem numerischem `max_width:` übernehmen.
-* **Bubble Card Popups:** vollständige Popup-Vorlagen direkt über einen Hash öffnen.
+Hash-Popups benötigen die originale Bubble Card ab **3.2.0** mit eigenständigem Popup-Format. Editorisolierung und Vorladen wurden zusätzlich mit den Originaldateien von **3.2.0 und 3.4.2** im Browser geprüft. Andere Fremdkarten und Versionen benötigen gegebenenfalls eigene Prüfungen. Das unveränderte Logo wird von HA ab **2026.3** lokal unterstützt; Store-Anzeige vor Installation hängt auch von Index und Cache ab.
 
-Custom Cards müssen separat installiert und als Ressourcen geladen sein. Eine vollständige Kompatibilität mit jedem fremden Kartentyp ist nicht zugesichert.
+### 4. Installation
 
-### Features
+1. Falls das Repository in HACS nicht gefunden wird: HACS → benutzerdefinierte Repositories → `https://github.com/Baeka89/library-card`, Kategorie **Integration**. Eine Aufnahme in den HACS-Standard wird hier nicht behauptet.
+2. Library Card über HACS herunterladen. Alternativ den vollständigen Ordner `custom_components/card_library` aus dem Installationsarchiv nach `/config/custom_components/card_library` kopieren.
+3. Home Assistant neu starten.
+4. Einstellungen → Geräte & Dienste → Integration hinzufügen → **Library Card**.
+5. Unter Einstellungen → Dashboards → Ressourcen den bestehenden Eintrag auf `/card_library/card-library.js?v=1.0.0` ändern oder, wenn noch keiner existiert, als JavaScript-Modul hinzufügen. Keine doppelte Ressource anlegen. Erweiterter Modus im HA-Profil kann dafür erforderlich sein.
+6. Browser vollständig neu laden. Die Karten **Kartenbibliothek** (`custom:library-manager`) und **Vorlagenkarte** (`custom:library-card`) sind anschließend verfügbar.
 
-* **Zentrale Vorlagen:** fertige Karten speichern, später bearbeiten, duplizieren und löschen. Zentrale Änderungen erreichen alle Verknüpfungen.
-* **Native HA-Oberfläche:** Menüs, Buttons und Felder folgen dem Home-Assistant-Theme; Originaleditoren behalten ihre eigene Oberfläche.
-* **Originale Karteneditoren:** den vorhandenen grafischen Editor der jeweiligen Karte nutzen; alternativ vollständige Karten-YAML direkt einfügen.
-* **Button-Card-Templates:** `button_card_templates` importieren und Entitäten/Variablen erst beim Einsetzen festlegen.
-* **Flexible Übernahme:** alles, nur markierte Designfelder oder ausgewählte Felder übernehmen; Entitäten je Verwendung anpassen.
-* **Gemeinsame Einstellungen:** beispielsweise Personenfarben zentral verwalten und mit mehreren Vorlagen verbinden.
-* **Örtliche Ausnahmen:** Entitäten, Gestaltung, `card_mod` und kartenspezifische Styles je Verknüpfung ändern.
-* **Popups ohne zusätzliche Dashboard-Karte:** ein Button öffnet die Bibliotheksvorlage über `#Hash`.
-* **Mehrere Popup-Verknüpfungen:** verschiedene Hashes mit eigenen örtlichen Einstellungen für dieselbe Vorlage speichern.
-* **Vorlagen organisieren:** definierte Eingabefelder, Kategorien/Suche, Vorlagenschutz, gezielte Rücknahme und Änderungsvorschau.
-* **Lokale Verwendungen:** ansehen/bearbeiten, vergleichen und mit lokalen Ausnahmen duplizieren; fehlende Entitäten und Ausnahmen erkennen.
-* **Nutzungsübersicht:** Fundstellen je Vorlage sehen und Dashboard-Ansichten oder erkannte Popups direkt öffnen.
-* **Bibliotheksverwaltung:** JSON-Import/Export, Verlauf, Wiederherstellung und Prüfung bekannter Dashboard-Verwendungen.
+### 5. Einrichtung und Authentifizierung
 
-### Zwei getrennte Arbeitsbereiche
+Es werden die vorhandene HA-Anmeldung und deren Berechtigungen verwendet; zusätzliche Zugangsdaten sind nicht erforderlich. Schreibende Verwaltungsfunktionen benötigen Administratorrechte. Eine Verwaltungskarte im Dashboard dient der zentralen Pflege.
 
-* **Konfiguration / Kartenbibliothek:** zentrale Vorlagen, gemeinsame Einstellungen und Personen verwalten. Änderungen mit **Zentrale Änderungen speichern** übernehmen.
-* **Vorlagen einsetzen / Vorlagenkarte:** eine Vorlage auswählen und örtliche Ausnahmen festlegen. Normale Karten anschließend im Dashboard speichern.
+### 6. Konfiguration und Optionen
 
-Eigene Hash-Verknüpfungen werden unter **Vorlagen einsetzen** direkt in der Integration gespeichert. In der zentralen Verwaltung gehören sie zunächst zum Entwurf und werden mit den zentralen Änderungen gespeichert.
+Vorlagen mit dem Originaleditor erstellen oder vorhandenes Karten-YAML übernehmen. Ganze Kartenbäume bleiben erhalten. Gruppen und Personenfarben können an Felder oder vollständige Bereiche gebunden werden. Eingabefelder unterstützen Entität, Text, Zahl, Schalter und Auswahl, einschließlich Pflichtfeldern und Entitätsdomänen. Geschützte Vorlagen müssen separat entsperrt und gespeichert werden.
 
-### Unterstützung
+**Popup laden:** je Vorlage „Beim Öffnen laden“ (Standard) oder „Im Hintergrund vorladen und bereithalten“. Gespeicherte Hash-Varianten können den Vorlagenwert übernehmen oder ausdrücklich vorladen bzw. erst beim Öffnen laden. Intern sind dies `template.preload` und optional `popup_links[].preload`; diese Bibliotheksmetadaten sind keine Bubble-Optionen. Vorladen gilt je Browser-Sitzung, benötigt zusätzlichen Speicher und hält die ausgewählten Originalkarten außerhalb des Dashboard-Rasters verbunden. Unveränderte Varianten werden weiterverwendet; Änderungen und ungültige Pflichtwerte werden berücksichtigt.
 
-Wenn dir diese Integration hilft, freue ich mich über eine kleine Unterstützung für die Weiterentwicklung:
+**YAML anzeigen / kopieren:** unter „Vorlagenaktionen“ die zentrale Vorlage oder eine gespeicherte Hash-Variante auswählen. Die vollständige Momentaufnahme enthält aktuelle gemeinsame Werte, örtliche Ausnahmen der gewählten Variante, Unterkarten, Popup-Optionen und fremde Konfigurationsfelder. Ein Textfeld ermöglicht manuelles Kopieren, wenn die Zwischenablage nicht verfügbar ist. Kopieren ändert keine Verknüpfung. Zentrale Kopf-/Fußzeilen werden wieder als äußeres `card:`/`max_width:` ausgegeben; innerhalb eines Popups kann der vorhandene Container-Adapter zur Erhaltung der Breite nötig bleiben.
 
-👉 **[Spende via PayPal](https://paypal.me/misomazo)**
+### 7. Verwendung
 
----
+„Diese Vorlage verwenden“ erstellt eine Bibliotheksreferenz. Lokale Entitäten, Variablen, Designfelder, CSS und card-mod können anschließend angepasst werden. YAML zum Einbauen sowie Buttons erzeugt die Oberfläche für die ausgewählte Vorlage.
 
-<a name="english"></a>
+Für ein Popup genügt ein Navigationsbutton zum gespeicherten Hash. Es sind weder eine zusätzliche Popup-Karte noch ein Platzhalter im Raster erforderlich. Ein eigenständiges Bubble-Popup mit `cards:`, ein klassischer vertical-stack mit Popup-Kopf oder eine normale Karte können als Inhalt dienen. Mehrere Hash-Varianten verweisen auf dieselbe Vorlage; alle Buttons mit demselben Hash teilen dieselbe gespeicherte Variante. Direkte `fire-dom-event`-Aufrufe mit `card_library` bleiben möglich.
 
-## English 🇺🇸
+Beim Bearbeiten von Bubble-Unterkarten verwendet die Bibliothek einen eigenen nativen HA-Dialog mit eigenem Speicheraufruf. Änderungen werden an den eingebetteten Originaleditor zurückgegeben und anschließend nach dem bestehenden Ablauf gespeichert. Die Dashboardposition der Verwaltungskarte ist dadurch kein Speicherziel der Popup-Unterkarte.
 
-### About this Project
+UI-Dashboards werden über Lovelace-Schnittstellen mit Fingerprint- und Revisionsprüfung geändert. Für YAML-Dashboards wird die Konfiguration zum manuellen Übernehmen ausgegeben. Die Nutzungsübersicht zählt gespeicherte Verknüpfungen und statisch erkennbare Popup-Aufrufe; sie ist keine Klickstatistik.
 
-**Library Card** provides a central card library for Home Assistant. Design a card once, save it as a template and reuse it anywhere as a **linked card**. Template changes automatically update its linked uses while preserving local exceptions.
+### 8. Aktualisierung und Migration
 
-Example: a dashboard calendar and a screensaver calendar display different information while sharing centrally managed person colors.
+Über HACS aktualisieren, HA neu starten, die bestehende Ressource auf `/card_library/card-library.js?v=1.0.0` ändern und Browser vollständig neu laden. Domain und Bibliotheksspeicher bleiben `card_library`; Integrationseinträge und `.storage` nicht löschen. Es ist keine Datenmigration erforderlich. Bereits durch den früheren Fehler ersetzte Dashboardkarten werden nicht automatisch zurückgeschrieben; die Verwaltungskarte bei Bedarf wieder hinzufügen.
 
-The integration requires Home Assistant **2024.7.0** or newer. Setup and the library interface support German and English. Third-party cards retain their own translations and editors.
+Für die Veröffentlichung auf dem Ubuntu-PC dient **ein vollständiges Aktualisierungsskript** mit eingebetteten Quellen. Es aktualisiert `/home/ubuntu/Projekte/Projekt Library-Card`, führt Prüfungen durch, lädt den Commit hoch, wartet auf HACS/Hassfest/Tests und erstellt erst danach das Release. Unbekannte lokale Änderungen und abweichende Tags/Dateien stoppen den Ablauf. Einzelheiten: [Veröffentlichung](docs/PUBLISH.md).
 
-### Supported Cards
+### 9. Einschränkungen und Fehlerbehebung
 
-* **Home Assistant cards:** use built-in card types through Home Assistant's card helpers.
-* **Installed custom cards:** reuse existing cards and their graphical editors when provided.
-* **Complete stacks:** save `horizontal-stack`, `vertical-stack` and `grid` configurations including their child cards.
-* **Headers and footers:** import configurations wrapped in `card:` with an optional numeric `max_width:`.
-* **Bubble Card popups:** open complete popup templates directly through a hash.
+Nicht jede Fremdkarte besitzt einen grafischen Editor. Vorladen garantiert keine abgeschlossenen Netzabfragen und kann sichtbarkeitsabhängige Initialisierung einer Unterkarte nicht erzwingen. Dynamische JavaScript-/Jinja-Aufrufe lassen sich nicht vollständig statisch erfassen. Die Bubble-Kompatibilitätsadapter sind an vorhandene Fähigkeiten gebunden; bei inkompatiblen Versionen gibt es eine Meldung und Vorladen fällt auf Laden beim Öffnen zurück. Ein nicht sicher isolierbarer Unterkarteneditor wird gesperrt.
 
-Custom cards must be installed separately and loaded as resources. Compatibility with every third-party card type is not guaranteed.
+Bei alten Ansichten Ressourcenversion und Browsercache prüfen. Bei fehlenden Karten zuerst Fremdressourcen und Entitäten prüfen. Der Teststand verwendet teilweise nachgebildete HA-Schnittstellen; ein vollständiger Test auf einer realen HA-Installation mit allen Themes und Mobilgeräten ist nicht erfolgt.
 
-### Features
+### 10. Entwicklung und Tests
 
-* **Central templates:** save, edit, duplicate and delete cards. Central changes reach all linked uses.
-* **Native HA interface:** menus, buttons and fields follow the Home Assistant theme; original editors keep their own interface.
-* **Original card editors:** use the card's existing graphical editor or paste complete card YAML directly.
-* **Button Card templates:** import `button_card_templates` and set entities/variables when inserting a linked card.
-* **Flexible inheritance:** inherit everything, marked design fields or selected fields; change entities per use.
-* **Shared settings:** centrally manage values such as person colors and link them to multiple templates.
-* **Local exceptions:** change entities, design, `card_mod` and card-specific styles per linked card.
-* **Popups without an extra dashboard card:** open a library template through a `#Hash` button.
-* **Multiple popup links:** assign different hashes and local settings to the same template.
-* **Template organization:** defined inputs, categories/search, protection, selective rollback and change previews.
-* **Local uses:** inspect/edit, compare and duplicate linked variants; identify missing entities and local exceptions.
-* **Usage overview:** see references per template and open dashboard views or detected popups.
-* **Library management:** JSON import/export, history, restoration and checks for known dashboard uses.
+Für lokale Entwicklungs-/Veröffentlichungsprüfungen: Python ab 3.12, Node.js ab 22 und `requirements-dev.txt`. **620 JavaScript- und 181 Python-Tests** sowie alle neun WebSocket-Schemas mit voluptuous und probatio wurden lokal geprüft. Browserregressionen verwenden originale Bubble-Dateien und nachgebildete HA-Dialog-/Speicherschnittstellen. Details, Aufrufe und Grenzen: [Prüfungen](docs/TESTS.md).
 
-### Two Separate Workspaces
+### 11. Versionshistorie
 
-* **Configuration / card library:** manage central templates, shared settings and people. Commit changes with the central save button.
-* **Insert templates / template card:** select a template and define local exceptions. Save regular cards in the dashboard afterward.
+[CHANGELOG.md](CHANGELOG.md) und [GitHub-Releases](https://github.com/Baeka89/library-card/releases). Die Einträge beschreiben veröffentlichte Stände; lokale Prüfrunden erhalten keine eigene Version.
 
-Custom hash links are saved directly to the integration from the insertion workspace. In central management, they remain part of the draft until central changes are saved.
+### 12. Unterstützung, Mitwirkung, Danksagung und Lizenz
 
-### Support
+Fehler mit Versionen und nachvollziehbarem Ablauf als [Issue](https://github.com/Baeka89/library-card/issues) melden. Beiträge sind per Pull Request willkommen; siehe [CONTRIBUTING.md](CONTRIBUTING.md). Danke an Home Assistant, HACS und die Entwickler der unterstützten Originalkarten, insbesondere Bubble Card. Unterstützung ist über [PayPal](https://paypal.me/misomazo) möglich. Lizenz: [MIT](LICENSE).
 
-If you find this integration useful, please consider supporting its development:
+<a id="english"></a>
+## English
 
-👉 **[Donate via PayPal](https://paypal.me/misomazo)**
+### 1. Project and short description
 
----
+Library Card centrally manages reusable dashboard cards in Home Assistant. This document describes **v1.0.0**. Dashboard cards stay linked to their template; local exceptions supplement that template.
 
-## How to Install / Installation
+### 2. Purpose and features
 
-Der [HACS-Standardantrag](https://github.com/hacs/default/pull/11851) ist eingereicht. Bis zur Aufnahme als benutzerdefiniertes Repository installieren. / The [HACS default-repository application](https://github.com/hacs/default/pull/11851) has been submitted. Until inclusion, install as a custom repository.
+Central changes reach every linked use. Entities, variables, layout, styles, card-mod and popup options may differ locally. Shared settings and person colors remain central. The interface separates insertion from configuration and uses native HA controls.
 
-1. **Repository hinzufügen / Add repository:** In HACS → ⋮ → Benutzerdefinierte Repositories / Custom repositories, add `https://github.com/Baeka89/library-card`. Kategorie / Category: **Integration**.
-2. **Installieren / Install:** Download **Library Card** in HACS.
-3. **Neustart / Restart:** Restart Home Assistant.
-4. **Einrichten / Setup:** Einstellungen / Settings → Geräte & Dienste / Devices & Services → Integration hinzufügen / Add integration → **Library Card**.
-5. **Ressource / Resource:** Enable advanced mode in your HA profile. Einstellungen / Settings → Dashboards → ⋮ → Ressourcen / Resources: add `/card_library/card-library.js?v=0.5.2` as **JavaScript-Modul / JavaScript module**.
-6. **Browser neu laden / Reload browser:** In the dashboard card picker, choose **Kartenbibliothek** (card library) to manage templates or **Vorlagenkarte** (template card) to insert a linked card.
+Features include original card editors, YAML input, JSON import/export, named Button Card templates with static inheritance, categories/search, defined inputs, template protection, up to ten previous saved states, individual restoration and change previews. Uses can be inspected, edited, compared and duplicated; the overview shows locations and missing entities.
 
-[![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Baeka89&repository=library-card&category=integration)
+### 3. Systems, devices and prerequisites
 
-**Manuell / Manual:** Copy `custom_components/card_library` to `/config/custom_components/card_library`, then follow steps 3–6.
+Home Assistant **2024.7.0 or newer**. Built-in cards, installed custom cards and complete horizontal-stack, vertical-stack and grid configurations are supported. Header/footer configurations may contain an outer `card:` and numeric `max_width:`. Install and load any custom cards and card-mod separately.
 
----
+Hash popups require original Bubble Card **3.2.0 or newer** with standalone popups. Editor isolation and preloading were additionally checked in a browser with original **3.2.0 and 3.4.2** files. Other third-party cards and versions may require their own checks. HA **2026.3+** supports the unchanged local logo; store visibility before installation also depends on index and cache.
 
-## Create and Reuse Templates / Vorlagen erstellen und einsetzen
+### 4. Installation
 
-### Deutsch 🇩🇪
+1. If HACS does not find the repository: add `https://github.com/Baeka89/library-card` as a custom repository, category **Integration**. Inclusion in the HACS default catalog is not claimed here.
+2. Download Library Card through HACS. Alternatively copy the entire `custom_components/card_library` directory from the installation archive to `/config/custom_components/card_library`.
+3. Restart Home Assistant.
+4. Settings → Devices & services → Add integration → **Library Card**.
+5. Under Settings → Dashboards → Resources, update the existing entry to `/card_library/card-library.js?v=1.0.0`, or add it as a JavaScript module if absent. Avoid duplicate resources. Advanced mode in the HA profile may be required.
+6. Fully reload the browser. **Kartenbibliothek** (`custom:library-manager`) and **Vorlagenkarte** (`custom:library-card`) are then available.
 
-1. **Kartenbibliothek** öffnen → **Konfiguration → Vorlage hinzufügen**.
-2. Karte auswählen, eine vorhandene Dashboard-Karte übernehmen oder vollständige YAML einfügen. Auch ganze Stacks sind möglich.
-3. Im Originaleditor bearbeiten, Vorlage benennen und **Zentrale Änderungen speichern**.
-4. Am gewünschten Dashboard-Platz eine **Vorlagenkarte** hinzufügen → **Vorlagen einsetzen** → Vorlage auswählen.
-5. Übernahme festlegen und bei Bedarf **Örtliche Anpassungen** ändern. Danach das Dashboard speichern.
+### 5. Setup and authentication
 
-Designfelder zuerst zentral markieren. **Nur markiertes Design übernehmen** verknüpft diese Felder; andere vorhandene Werte bleiben lokal. Nach geänderten Designmarkierungen den Modus erneut anwenden. Mit **Feld wieder aus Vorlage übernehmen** eine örtliche Ausnahme aufheben. Gruppen- und Personenbindungen bleiben verbindlich.
+The integration uses the existing HA login and permissions; no additional credentials are required. Administrative writes require administrator rights. A manager card on the dashboard provides central management.
 
-### English 🇺🇸
+### 6. Configuration and options
 
-1. Open the card library → **Configuration → Add template**.
-2. Select a card, import an existing dashboard card or paste its complete YAML. Whole stacks are supported.
-3. Edit with the original editor, name the template and save central changes.
-4. Add a template card at the desired dashboard location → insertion workspace → select the template.
-5. Choose inheritance and adjust local settings if needed. Save the dashboard afterward.
+Create templates with their original editor or import existing card YAML. Complete card trees are preserved. Bind groups and person colors to individual fields or whole sections. Inputs support entity, text, number, boolean and selection, including required fields and entity domains. Protected templates must first be unlocked and saved separately.
 
-Mark design fields centrally first. Inheriting only marked design links these fields while retaining other existing values locally. Reapply this mode after changing design markers. Restore inheritance for a field to remove its local exception. Group and person bindings remain authoritative.
+**Popup loading:** choose loading when opened (default) or background preload and retention per template. Saved hash variants can inherit this choice or explicitly enable or disable preloading. Internally these are `template.preload` and optional `popup_links[].preload`; they are library metadata, not Bubble options. Preloading is per browser session, consumes additional memory and keeps selected original cards connected outside the dashboard grid. Unchanged variants are reused; changes and invalid required inputs are respected.
 
----
+**Show / copy YAML:** under template actions, choose the central template or a saved hash variant. The complete snapshot contains current shared values, that variant's local exceptions, child cards, popup options and third-party configuration fields. A text field permits manual copying when clipboard access is unavailable. Copying does not change links. Central header/footer exports restore the outer `card:`/`max_width:` structure; popup content may retain the existing container adapter to preserve width.
 
-## Bubble Card Popups / Bubble-Card-Popups
+### 7. Usage
 
-### Deutsch 🇩🇪
+Using a template creates a library reference. Local entities, variables, design fields, CSS and card-mod can then be adjusted. The interface generates insertion YAML and buttons for the selected template.
 
-Bubble Card ab **3.2.0** mit Standalone-Popups separat installieren. Eine vollständige Bubble-Popup-Karte in der Bibliothek speichern. Ihr zentraler Hash, beispielsweise `#Menu`, wird automatisch erkannt.
+A navigation button targeting the saved hash is sufficient for a popup. No extra popup card or grid placeholder is required. Standalone Bubble popups with `cards:`, classic vertical stacks with a popup header and ordinary cards can provide content. Multiple hash variants can reference one template; all buttons with the same hash share that saved variant. Explicit `fire-dom-event` calls with `card_library` remain available.
 
-Unter **Als Bubble-Popup verwenden** den wirksamen zentralen Hash und Button-Code ansehen. Unter **Eigene Popup-Verknüpfung** zusätzliche Hashes wie `#Menu-Wohnzimmer` oder `#Menu-Flur` mit örtlichen Ausnahmen speichern.
+Bubble child-card editing uses a separate native HA dialog with its own save callback. Changes return to the embedded original editor and are saved through the existing workflow. The manager card's dashboard position is therefore not a save destination for the popup child.
 
-**Nur der öffnende Button kommt ins Dashboard.** Die Bibliotheksressource lädt die passende Popup-Vorlage im Hintergrund. Es wird keine zusätzliche Popup- oder Vorlagenkarte auf der Zielseite benötigt.
+UI dashboards are changed through Lovelace interfaces with fingerprint and revision checks. YAML dashboard configurations are exported for manual application. Usage counts cover saved links and statically recognizable popup calls; they are not click statistics.
 
-### English 🇺🇸
+### 8. Updating and migration
 
-Install Bubble Card **3.2.0** or newer with standalone popup support separately. Save a complete Bubble popup card in the library. Its central hash, such as `#Menu`, is detected automatically.
+Update through HACS, restart HA, change the existing resource to `/card_library/card-library.js?v=1.0.0` and fully reload the browser. The domain and library storage remain `card_library`; do not delete integration entries or `.storage`. No data migration is required. Dashboard cards already replaced by the earlier bug are not automatically rewritten; re-add the manager card if needed.
 
-The popup section shows the effective central hash and button configuration. Custom popup links provide additional hashes such as `#Menu-Wohnzimmer` or `#Menu-Flur` with local exceptions.
+For publication on Ubuntu, use **one complete updater script** with embedded source. It updates `/home/ubuntu/Projekte/Projekt Library-Card`, runs checks, uploads the commit, waits for HACS/Hassfest/tests and only then creates the release. Unknown local edits and divergent tags/assets stop the process. Details: [Publication](docs/PUBLISH.md).
 
-**Place only the opening button on the dashboard.** The library resource loads the matching popup template in the background. No additional popup or template card is required on the target page.
+### 9. Limitations and troubleshooting
 
-```yaml
-type: button
-name: Menü / Menu
-tap_action:
-  action: navigate
-  navigation_path: '#Menu-Wohnzimmer'
-```
+Not every custom card has a graphical editor. Preloading does not guarantee completed network requests and cannot force a child's visibility-dependent initialization. Dynamic JavaScript/Jinja calls cannot be fully recognized statically. Bubble compatibility adapters check existing capabilities; incompatible versions produce a message and preloading falls back to loading on open. Child-card editors that cannot be isolated safely are blocked.
 
-Der Hash muss zuvor in der Bibliothek gespeichert sein. / Save this hash in the library first.
+For stale views, check resource version and browser cache. For missing cards, check third-party resources and entities first. Some tests use simulated HA interfaces; a complete live HA test with all themes and mobile devices has not been performed.
 
-[Popup-Anleitung / Popup guide](BUBBLE-POPUPS.md) · [Button-Card-Vorlagen / Button Card templates](docs/BUTTON-TEMPLATES.md)
+### 10. Development and tests
 
----
+Local development/publication checks require Python 3.12+, Node.js 22+ and `requirements-dev.txt`. **620 JavaScript and 181 Python tests**, plus all nine WebSocket schemas with voluptuous and probatio, were checked locally. Browser regressions use original Bubble files and simulated HA dialog/storage interfaces. Details, commands and limits: [Tests](docs/TESTS.md).
 
-## Styles and Shared Settings / Gestaltung und gemeinsame Einstellungen
+### 11. Version history
 
-**Deutsch:** Gemeinsame Gruppen und Personenfarben zentral pflegen. Unter **Zusätzliche lokale Styles** oder **Vollständige lokale Konfiguration (YAML)** örtliche Gestaltung ändern. `card_mod` setzt card-mod voraus; andere Style-Felder müssen vom jeweiligen Kartentyp unterstützt werden. Die Bibliothek übergibt diese Einstellungen an die Karte.
+See [CHANGELOG.md](CHANGELOG.md) and [GitHub releases](https://github.com/Baeka89/library-card/releases). Entries describe published versions; local verification rounds receive no separate version.
 
-**English:** Manage shared groups and person colors centrally. Use additional local styles or complete local YAML for local design changes. `card_mod` requires card-mod; other styling keys must be supported by the target card. The library passes these settings to the card.
+### 12. Support, contributions, acknowledgements and license
 
----
-
-## Maintenance and Limits / Verwaltung und Grenzen
-
-* **Berechtigungen / Permissions:** Administrators manage central templates and hash links. All authenticated HA users can read the library.
-* **Daten / Data:** Templates are stored in HA `.storage`. Replace program files during updates; existing templates remain. Reload the browser and update the resource version when it changes.
-* **Import / Export:** Complete card configurations use YAML; full libraries with groups and people use JSON. YAML comments, `!include` and external file references are not retained.
-* **Löschen / Deleting:** Template actions provide deletion. Known dashboard uses block it; inaccessible dashboards are reported. The check is a snapshot rather than a transactional lock.
-* **Grenzen / Limits:** The library and each resolved card are limited to 2 MB. Unsaved strategy dashboards and standalone screensavers cannot be fully imported.
-* **Vorschau / Preview:** Previews are real cards with active actions. Do not store access credentials in templates.
-
-[Neue Arbeitsabläufe / Workflows](docs/WORKFLOWS.md) · [Nutzungsübersicht / Usage overview](docs/USAGE-OVERVIEW.md) · [Weitere Bedienhinweise / More usage details](docs/USAGE.md) · [Tests und Prüfgrenzen / Tests and verification limits](docs/TESTS.md)
-
----
-
-### Technical Components / Technische Komponenten
-
-* `custom_components/card_library/`: Home Assistant integration, setup, storage and WebSocket API.
-* `custom_components/card_library/frontend/`: Template card, library manager, original editor integration and popup handling.
-* `custom_components/card_library/brand/`: Local HACS branding.
-* `tests/`: JavaScript and Python regression tests.
-* `publish.py`: First-publication workflow; documentation in [docs/PUBLISH.md](docs/PUBLISH.md).
-
-See [CHANGELOG.md](CHANGELOG.md) for release notes. / Änderungen stehen in [CHANGELOG.md](CHANGELOG.md).
-
-### Development / Entwicklung
-
-```bash
-python -m pip install -r requirements-dev.txt
-npm test
-python -m unittest discover -s tests -p 'test_*.py' -v
-python tests/check_websocket_schemas.py
-```
-
-[HACS audit / HACS-Prüfbericht](docs/HACS-AUDIT.md)
-
-### Thanks / Danke
-
-Maintained by **[@Baeka89](https://github.com/Baeka89)**. Thanks to Home Assistant and the authors of the original card editors, [Bubble Card](https://github.com/Clooos/Bubble-Card) and [Family Calendar Card](https://github.com/Baeka89/family-calendar-card).
-
-### License / Lizenz
-
-[MIT License](LICENSE). External cards retain their own licenses. / Fremde Karten behalten ihre eigenen Lizenzen.
-
-### Projekt-Logo / Project icon
-
-Das freigegebene Logo liegt als `brand/icon.png` (256 px) und `brand/icon@2x.png` (512 px) in der Integration. Home Assistant 2026.3+ lädt diese lokalen Dateien für die Integrationsübersicht. Aktuelle HACS-Versionen nutzen die HA-Brand-Anzeige. Nach Installation oder Aktualisierung HA neu starten und den Browsercache bei Bedarf leeren. Die Sichtbarkeit vor der Installation hängt vom verwendeten HACS-/Marketplace-Index ab; ein lokales Projektupdate veröffentlicht das Logo noch nicht.
-
-The approved icon ships inside the integration as `brand/icon.png` (256 px) and `brand/icon@2x.png` (512 px). HA 2026.3+ serves these local assets for the integrations overview. Current HACS versions use HA branding. Restart HA after updating and clear the browser cache if necessary. Visibility before installation depends on the HACS/Marketplace index; updating this local project does not publish the icon.
+Report issues with versions and a reproducible sequence through [GitHub issues](https://github.com/Baeka89/library-card/issues). Pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Thanks to Home Assistant, HACS and the developers of the supported original cards, particularly Bubble Card. Support via [PayPal](https://paypal.me/misomazo). License: [MIT](LICENSE).

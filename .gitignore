@@ -12,3 +12,5 @@ Thumbs.db
 .storage/
 secrets.yaml
 home-assistant.log*
+
+.checks/

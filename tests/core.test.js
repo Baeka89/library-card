@@ -452,7 +452,7 @@ test('popup route accepts an original standalone Bubble popup without changing i
   const baseline = structuredClone(lib);
   assert.doesNotThrow(() => validatePopupRoutes(lib));
   assert.deepEqual(popupTemplateInfo(lib.templates.calendar.config), {path:[],hash:undefined,supported:true});
-  assert.deepEqual(popupTemplateRoute(lib,lib.templates.calendar), {hash:'#kalender',options:{},native:true});
+  assert.deepEqual(popupTemplateRoute(lib,lib.templates.calendar), {hash:'#kalender',options:{},native:true,preload:false});
   assert.deepEqual(importLibrary(exportLibrary(lib)), {...baseline,people:{}});
 });
 test('native standalone and classic stack popup hashes provide automatic routes', async () => {
@@ -462,8 +462,8 @@ test('native standalone and classic stack popup hashes provide automatic routes'
   const lib = {templates:{s:{name:'Standalone',config:standalone},l:{name:'Stack',config:stack}},groups:{},people:{}};
   assert.deepEqual(popupTemplateInfo(standalone), {path:[],hash:'#standalone',supported:true});
   assert.deepEqual(popupTemplateInfo(stack), {path:['cards',0],hash:'#legacy',supported:true});
-  assert.deepEqual(popupTemplateRoute(lib,lib.templates.s), {hash:'#standalone',options:{},native:true});
-  assert.deepEqual(popupTemplateRoute(lib,lib.templates.l), {hash:'#legacy',options:{},native:true});
+  assert.deepEqual(popupTemplateRoute(lib,lib.templates.s), {hash:'#standalone',options:{},native:true,preload:false});
+  assert.deepEqual(popupTemplateRoute(lib,lib.templates.l), {hash:'#legacy',options:{},native:true,preload:false});
   assert.doesNotThrow(() => validatePopupRoutes(lib));
   assert.deepEqual(importLibrary(exportLibrary(lib)),lib);
   assert.equal(popupTemplateInfo({type:'vertical-stack',cards:[{type:'markdown'},...stack.cards]}),null);
@@ -509,7 +509,7 @@ test('automatic and explicit native popup hashes share one strict duplicate name
   assert.throws(() => validatePopupRoutes(lib),/bereits/);
   lib.templates.a.popup = {hash:'#override',options:{name:'Override',styles:'ha-card { border: 0; }'}};
   assert.doesNotThrow(() => validatePopupRoutes(lib));
-  assert.deepEqual(popupTemplateRoute(lib,lib.templates.a), {hash:'#override',options:lib.templates.a.popup.options,native:true});
+  assert.deepEqual(popupTemplateRoute(lib,lib.templates.a), {hash:'#override',options:lib.templates.a.popup.options,native:true,preload:false});
   delete lib.templates.a.popup;
   delete lib.templates.b;
   for (const hash of ['#','invalid','#space here','#same\n','#card-library-popup-internal',42,false,['#same']]) {
@@ -521,13 +521,13 @@ test('native popup route lookup resolves only its structural binding paths', asy
   const {popupTemplateRoute,validatePopupRoutes} = await import('../custom_components/card_library/frontend/library-core.js');
   const lib = {templates:{t:{name:'Bound stack',config:{type:'vertical-stack',cards:[]},bindings:[{path:['cards'],group:'cards'},{path:['card_mod'],group:'unrelated'}]}},groups:{cards:{name:'Cards',value:[{type:'custom:bubble-card',card_type:'pop-up',hash:'#bound'},{type:'markdown',content:'x'}]},unrelated:{name:'Unused'}},people:{}};
   Object.defineProperty(lib.groups.unrelated,'value',{get(){throw Error('Unrelated group must not be resolved');}});
-  assert.deepEqual(popupTemplateRoute(lib,lib.templates.t),{hash:'#bound',options:{},native:true});
+  assert.deepEqual(popupTemplateRoute(lib,lib.templates.t),{hash:'#bound',options:{},native:true,preload:false});
   assert.doesNotThrow(() => validatePopupRoutes(lib));
   lib.templates.t.config = {type:'custom:bubble-card',card_type:'button',cards:[]};
   lib.templates.t.bindings = [{path:['card_type'],group:'kind'},{path:['hash'],group:'hash'},{path:['card_mod'],group:'unrelated'}];
   lib.groups.kind = {name:'Kind',value:'pop-up'};
   lib.groups.hash = {name:'Hash',value:'#bound-standalone'};
-  assert.deepEqual(popupTemplateRoute(lib,lib.templates.t),{hash:'#bound-standalone',options:{},native:true});
+  assert.deepEqual(popupTemplateRoute(lib,lib.templates.t),{hash:'#bound-standalone',options:{},native:true,preload:false});
   assert.doesNotThrow(() => validatePopupRoutes(lib));
 });
 

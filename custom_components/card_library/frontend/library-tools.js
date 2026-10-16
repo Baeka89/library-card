@@ -1,4 +1,4 @@
-import {walkCards, dependencies, popupTemplateRoutes} from './library-core.js?v=0.5.2';
+import {walkCards, dependencies, popupTemplateRoutes} from './library-core.js?v=1.0.0';
 // Saved scan snapshots are read-only within the application. Build their action
 // index once instead of walking every dashboard again for each template row.
 const scannedUsageIndexes = new WeakMap();

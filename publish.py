@@ -16,12 +16,12 @@ import sys
 import tempfile
 import time
 
-VERSION = "0.5.2"
+VERSION = "1.0.0"
 TAG = f"v{VERSION}"
 SOURCE = Path(__file__).resolve().parent
 DESCRIPTION = "Reusable Home Assistant dashboard templates, shared settings and hash-based Bubble popups."
 TOPICS = ["home-assistant", "hacs", "lovelace", "custom-integration", "dashboard", "bubble-card", "templates"]
-EXCLUDED = {".git", ".venv", ".publication", "dist", "__pycache__", "node_modules", ".pytest_cache", ".storage"}
+EXCLUDED = {".git", ".venv", ".publication", "dist", "__pycache__", "node_modules", ".pytest_cache", ".storage", ".checks"}
 
 
 class PublicationError(RuntimeError):
@@ -137,7 +137,7 @@ def run_local_checks(runner, root):
     print("Lokale Prüfungen und isolierte Testabhängigkeiten …", flush=True)
     runner.run([python, "-m", "pip", "install", "--no-cache-dir", "--disable-pip-version-check", "-r", "requirements-dev.txt"], root)
     runner.run([python, "scripts/check_release.py", "--configured"], root)
-    for name in ("core", "tools", "workflows", "ui", "native-ui", "resources", "family-calendar", "popup", "popup-resource"):
+    for name in ("core", "tools", "workflows", "ui", "native-ui", "resources", "family-calendar", "popup", "popup-resource", "yaml-export", "editor-scope", "preload"):
         runner.run(["node", f"tests/{name}.test.js"], root)
     for path in (root / "custom_components/card_library/frontend").glob("*.js"):
         runner.run(["node", "--check", path], root)
@@ -395,7 +395,7 @@ def submit_hacs(runner, root, identity, user, release, checks):
 
 
 def main(argv=None, runner=None):
-    parser = argparse.ArgumentParser(description="Library Card v0.5.2 vorbereiten, veröffentlichen und bei HACS einreichen.")
+    parser = argparse.ArgumentParser(description="Library Card v1.0.0 vorbereiten, veröffentlichen und bei HACS einreichen.")
     parser.add_argument("--project-dir", type=Path, help="Lokaler Projekteordner; ohne Angabe wird der entpackte Quellordner verwendet")
     parser.add_argument("--owner", help="GitHub-Benutzer; standardmäßig der angemeldete Benutzer")
     parser.add_argument("--repo", default="library-card")

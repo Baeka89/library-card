@@ -8,7 +8,7 @@ import zlib
 
 import yaml
 
-VERSION = "0.5.2"
+VERSION = "1.0.0"
 
 
 def valid_png(data: bytes, expected: int) -> bool:
@@ -136,9 +136,9 @@ def check(root: Path, configured: bool = True) -> list[str]:
             if not valid_png(data, expected):
                 problems.append(f"Invalid PNG image or dimensions for {filename}")
     modules = list((component / "frontend").glob("*.js"))
-    expected_modules = {"card-library.js", "library-core.js", "library-ha-ui.js", "library-manager-tools.js", "library-popup.js", "library-tools.js", "library-ui.js", "library-workflows.js"}
+    expected_modules = {"card-library.js", "library-core.js", "library-ha-ui.js", "library-manager-tools.js", "library-popup.js", "library-tools.js", "library-ui.js", "library-workflows.js", "library-yaml-export.js", "library-editor-scope.js", "library-bubble-preload.js", "library-preloaded-popups.js"}
     if {path.name for path in modules} != expected_modules:
-        problems.append("The eight frontend modules must be included")
+        problems.append("All twelve frontend modules must be included")
     for path in modules:
         for reference in re.findall(r"(?:from\s*|import\s*)['\"](\./[^'\"]+)['\"]", path.read_text(encoding="utf-8")):
             target, _, query = reference.partition("?")
